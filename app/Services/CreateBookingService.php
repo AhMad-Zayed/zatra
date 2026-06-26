@@ -22,103 +22,90 @@ class CreateBookingService
      * @param int $tenantId
      * @param int $tripInstanceId
      * @param int $userId
-     * @param array $passengersData Array of ['trip_pricing_tier_id' => int, 'dynamic_data' => array]
-     * @param array $addonsData Array of ['trip_addon_id' => int, 'quantity' => int]
-     * @param string|null $notes
-     * @return Booking
+     * Executes the creation of a booking, processing passengers, addons, and financials.
+     * 
+     * @param array $data Unified booking payload
+     * Expected keys: tenant_id, trip_instance_id, customer_id, passengersData, addonsData, user_id (optional creator), notes (optional)
      * @throws InventoryExhaustedException
      */
-    public function execute(
-        int $tenantId,
-        int $tripInstanceId,
-        int $customerId,
-        array $passengersData,
-        array $addonsData = [],
-        ?string $notes = null,
-        ?int $creatorUserId = null // Optional audit trail
-    ): Booking {
-        return DB::transaction(function () use (
-            $tenantId,
-            $tripInstanceId,
-            $customerId,
-            $passengersData,
-            $addonsData,
-            $notes,
-            $creatorUserId
-        ) {
-            // 1. Lock the TripInstance for update
+    public function execute(array $data): Booking
+    {
+        $tenantId = $data['tenant_id'];
+        $tripInstanceId = $data['trip_instance_id'];
+        $customerId = $data['customer_id'];
+        $passengersData = $data['passengersData'] ?? [];
+        $addonsData = $data['addonsData'] ?? [];
+        $creatorUserId = $data['user_id'] ?? null;
+        $notes = $data['notes'] ?? null;
+
+        return DB::transaction(function () use ($tenantId, $tripInstanceId, $customerId, $passengersData, $addonsData, $creatorUserId, $notes) {
+            
+            // 1. Lock the TripInstance for update to prevent race conditions on inventory
             $tripInstance = TripInstance::where('id', $tripInstanceId)
                 ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 2. Validate Seat Capacity
+            // 2. Check general inventory limits if applicable
             $requestedSeats = count($passengersData);
-            
-            // Calculate currently booked seats for this instance
-            // Assuming bookings that are not cancelled count towards capacity
-            $currentBookedSeats = Passenger::whereHas('booking', function ($query) use ($tripInstanceId) {
-                $query->where('trip_instance_id', $tripInstanceId)
-                      ->where('booking_status', '!=', BookingStatus::Cancelled);
-            })->count();
+            if ($tripInstance->max_capacity !== null) {
+                // Calculate current booked seats
+                $currentBooked = Passenger::whereHas('booking', function ($q) use ($tripInstanceId) {
+                    $q->where('trip_instance_id', $tripInstanceId)
+                      ->whereIn('booking_status', [BookingStatus::Confirmed, BookingStatus::Pending]); // Assuming pending holds inventory
+                })->count();
 
-            if (($currentBookedSeats + $requestedSeats) > $tripInstance->available_seats) {
-                throw new InventoryExhaustedException("Trip is fully booked. Not enough seats available.");
+                if (($currentBooked + $requestedSeats) > $tripInstance->max_capacity) {
+                    throw new InventoryExhaustedException("Sorry, only " . ($tripInstance->max_capacity - $currentBooked) . " seats left.");
+                }
             }
 
-            // 3. Create the Booking shell
+            // 3. Create the Booking Record (Owner is Customer, Creator is optional User)
             $booking = Booking::create([
                 'tenant_id' => $tenantId,
                 'trip_instance_id' => $tripInstanceId,
-                'customer_id' => $customerId,
-                'user_id' => $creatorUserId,
+                'customer_id' => $customerId, // The actual owner of the booking
+                'user_id' => $creatorUserId, // Audit trail: The Admin who created this (Null for self-checkout)
                 'booking_status' => BookingStatus::Pending,
                 'payment_status' => PaymentStatus::Unpaid,
                 'notes' => $notes,
             ]);
 
-            $grandTotal = 0;
+            $totalAmount = 0;
 
             // 4. Process Passengers
             foreach ($passengersData as $pData) {
-                $tierId = $pData['trip_pricing_tier_id'];
-                
-                $tier = TripPricingTier::where('id', $tierId)
-                    ->where('trip_instance_id', $tripInstanceId)
-                    ->firstOrFail();
-
+                $tier = TripPricingTier::where('id', $pData['trip_pricing_tier_id'])
+                            ->where('trip_instance_id', $tripInstanceId)
+                            ->firstOrFail();
+                            
                 Passenger::create([
                     'tenant_id' => $tenantId,
                     'booking_id' => $booking->id,
                     'trip_pricing_tier_id' => $tier->id,
-                    'price_at_booking' => $tier->price, // Snapshot
+                    'price_at_booking' => $tier->price,
                     'dynamic_data' => $pData['dynamic_data'] ?? null,
                 ]);
-
-                $grandTotal += $tier->price;
+                
+                $totalAmount += $tier->price;
             }
 
-            // 5. Process Addons with Pessimistic Locking
+            // 5. Process Addons
             foreach ($addonsData as $aData) {
-                $addonId = $aData['trip_addon_id'];
-                $requestedQty = $aData['quantity'];
-
-                if ($requestedQty <= 0) continue;
-
-                $addon = TripAddon::where('id', $addonId)
-                    ->where('trip_instance_id', $tripInstanceId)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
+                $addon = TripAddon::where('id', $aData['trip_addon_id'])
+                            ->where('trip_instance_id', $tripInstanceId)
+                            ->lockForUpdate()
+                            ->firstOrFail();
+                            
                 // Validate Addon Capacity if max_quantity is set
                 if ($addon->max_quantity !== null) {
-                    $currentAddonQty = BookingAddon::where('trip_addon_id', $addonId)
+                    $currentAddonQty = BookingAddon::where('trip_addon_id', $addon->id)
                         ->whereHas('booking', function ($query) {
                             $query->where('booking_status', '!=', BookingStatus::Cancelled);
                         })
                         ->sum('quantity');
 
-                    if (($currentAddonQty + $requestedQty) > $addon->max_quantity) {
+                    if (($currentAddonQty + $aData['quantity']) > $addon->max_quantity) {
                         throw new InventoryExhaustedException("Addon '{$addon->name}' has insufficient quantity available.");
                     }
                 }

@@ -42,11 +42,31 @@ class BookingResource extends Resource
                     ->schema([
                         Forms\Components\Section::make('معلومات الحجز')
                             ->schema([
-                                Forms\Components\Select::make('user_id')
-                                    ->relationship('user', 'name')
+                                Forms\Components\Select::make('customer_id')
+                                    ->relationship(
+                                        name: 'customer', 
+                                        titleAttribute: 'phone',
+                                        modifyQueryUsing: fn (Builder $query) => $query->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id)
+                                    )
+                                    ->getOptionLabelFromRecordUsing(fn (Model $record) => "{$record->name} - {$record->phone}")
                                     ->label('العميل (Lead Customer)')
                                     ->searchable()
                                     ->required()
+                                    ->createOptionForm([
+                                        Forms\Components\TextInput::make('name')
+                                            ->label('الاسم')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Forms\Components\TextInput::make('phone')
+                                            ->label('رقم الهاتف')
+                                            ->required()
+                                            ->tel()
+                                            ->maxLength(255),
+                                    ])
+                                    ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                                        $data['tenant_id'] = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id;
+                                        return $data;
+                                    })
                                     ->disabledOn('edit'),
                                 
                                 Forms\Components\Select::make('trip_instance_id')

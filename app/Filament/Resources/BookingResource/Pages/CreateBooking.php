@@ -14,11 +14,22 @@ class CreateBooking extends CreateRecord
 {
     protected static string $resource = BookingResource::class;
 
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        // 1. Silently inject the Audit Trail (Creator Admin ID)
+        $data['user_id'] = auth()->id();
+        
+        // 2. Silently inject the Tenant ID (Admin context)
+        $data['tenant_id'] = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id;
+
+        return $data;
+    }
+
     protected function handleRecordCreation(array $data): Model
     {
         $service = new CreateBookingService();
-        $tenantId = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id;
         
+        // Format Passengers Payload
         $passengersData = [];
         if (isset($data['passengers'])) {
             foreach ($data['passengers'] as $p) {
@@ -28,7 +39,9 @@ class CreateBooking extends CreateRecord
                 ];
             }
         }
+        $data['passengersData'] = $passengersData;
         
+        // Format Addons Payload
         $addonsData = [];
         if (isset($data['bookingAddons'])) {
             foreach ($data['bookingAddons'] as $a) {
@@ -38,16 +51,11 @@ class CreateBooking extends CreateRecord
                 ];
             }
         }
+        $data['addonsData'] = $addonsData;
 
         try {
-            $booking = $service->execute(
-                $tenantId,
-                $data['trip_instance_id'],
-                $data['user_id'],
-                $passengersData,
-                $addonsData,
-                $data['notes'] ?? null
-            );
+            // Pass the UNIFIED payload array to the refactored Service
+            $booking = $service->execute($data);
             
             if (isset($data['booking_status'])) {
                 $booking->update(['booking_status' => $data['booking_status']]);

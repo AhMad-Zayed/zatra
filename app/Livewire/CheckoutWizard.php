@@ -103,15 +103,19 @@ class CheckoutWizard extends Component
         $this->form->validate();
 
         try {
-            $booking = $bookingService->execute(
-                tenantId: $this->tripInstance->tenant_id,
-                tripInstanceId: $this->tripInstance->id,
-                customerId: $customer->id,
-                passengersData: $this->form->passengers,
-                addonsData: $this->form->addons,
-                notes: null,
-                creatorUserId: null // Null because it's a self-checkout
-            );
+            // Compile Unified Payload Array (DTO format)
+            $payload = [
+                'tenant_id' => $this->tripInstance->tenant_id,
+                'trip_instance_id' => $this->tripInstance->id,
+                'customer_id' => $customer->id,
+                'passengersData' => $this->form->passengers,
+                'addonsData' => $this->form->addons,
+                'notes' => null,
+                'user_id' => null, // Null because it's a B2C self-checkout (No Admin involved)
+            ];
+
+            // Call the refactored Service
+            $booking = $bookingService->execute($payload);
 
             // Redirect to a success/payment page
             return redirect()->route('storefront.catalog', ['tenant' => $this->tenant->slug])
