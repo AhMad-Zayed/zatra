@@ -31,18 +31,20 @@ class CreateBookingService
     public function execute(
         int $tenantId,
         int $tripInstanceId,
-        int $userId,
+        int $customerId,
         array $passengersData,
         array $addonsData = [],
-        ?string $notes = null
+        ?string $notes = null,
+        ?int $creatorUserId = null // Optional audit trail
     ): Booking {
         return DB::transaction(function () use (
             $tenantId,
             $tripInstanceId,
-            $userId,
+            $customerId,
             $passengersData,
             $addonsData,
-            $notes
+            $notes,
+            $creatorUserId
         ) {
             // 1. Lock the TripInstance for update
             $tripInstance = TripInstance::where('id', $tripInstanceId)
@@ -68,7 +70,8 @@ class CreateBookingService
             $booking = Booking::create([
                 'tenant_id' => $tenantId,
                 'trip_instance_id' => $tripInstanceId,
-                'user_id' => $userId,
+                'customer_id' => $customerId,
+                'user_id' => $creatorUserId,
                 'booking_status' => BookingStatus::Pending,
                 'payment_status' => PaymentStatus::Unpaid,
                 'notes' => $notes,
