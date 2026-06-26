@@ -48,15 +48,15 @@ class CreateBookingService
 
             // 2. Check general inventory limits if applicable
             $requestedSeats = count($passengersData);
-            if ($tripInstance->max_capacity !== null) {
+            if ($tripInstance->available_seats !== null) {
                 // Calculate current booked seats
                 $currentBooked = Passenger::whereHas('booking', function ($q) use ($tripInstanceId) {
                     $q->where('trip_instance_id', $tripInstanceId)
                       ->whereIn('booking_status', [BookingStatus::Confirmed, BookingStatus::Pending]); // Assuming pending holds inventory
                 })->count();
 
-                if (($currentBooked + $requestedSeats) > $tripInstance->max_capacity) {
-                    throw new InventoryExhaustedException("Sorry, only " . ($tripInstance->max_capacity - $currentBooked) . " seats left.");
+                if (($currentBooked + $requestedSeats) > $tripInstance->available_seats) {
+                    throw new InventoryExhaustedException("Sorry, only " . ($tripInstance->available_seats - $currentBooked) . " seats left.");
                 }
             }
 
@@ -114,17 +114,17 @@ class CreateBookingService
                     'tenant_id' => $tenantId,
                     'booking_id' => $booking->id,
                     'trip_addon_id' => $addon->id,
-                    'quantity' => $requestedQty,
+                    'quantity' => $aData['quantity'],
                     'price_at_booking' => $addon->price, // Snapshot
                 ]);
 
-                $grandTotal += ($addon->price * $requestedQty);
+                $totalAmount += ($addon->price * $aData['quantity']);
             }
 
             // 6. Update Final Totals
             $booking->update([
-                'grand_total' => $grandTotal,
-                'balance_due' => $grandTotal, // total_paid is 0
+                'grand_total' => $totalAmount,
+                'balance_due' => $totalAmount,
             ]);
 
             return $booking;

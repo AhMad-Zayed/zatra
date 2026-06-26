@@ -43,7 +43,7 @@ class CheckoutWizard extends Component
         $this->form->validateOnly('phone');
         
         try {
-            $otpService->sendOtp($this->form->phone, $this->tenant->id);
+            $otpService->sendOtp($this->tenant, $this->form->phone);
             $this->currentStep = 2; // Move to OTP verification
         } catch (\Exception $e) {
             $this->form->addError('phone', $e->getMessage());
@@ -56,7 +56,7 @@ class CheckoutWizard extends Component
 
         try {
             // This service method must now handle logging in the customer upon success
-            $customer = $otpService->verifyOtp($this->form->phone, $this->form->otp, $this->tenant->id);
+            $customer = $otpService->verifyOtp($this->tenant, $this->form->phone, $this->form->otp);
             
             // Explicitly log the customer in using the customer guard
             Auth::guard('customer')->login($customer);

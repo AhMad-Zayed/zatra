@@ -23,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Database\Eloquent\Model::unguard();
+        
         Payment::observe(PaymentObserver::class);
         Booking::observe(BookingObserver::class);
     }
