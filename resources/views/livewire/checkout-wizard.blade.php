@@ -124,6 +124,18 @@
                     @enderror
                 </div>
 
+                @if(auth('customer')->check())
+                    <div class="mb-6 p-4 bg-zatara-blue/5 border border-zatara-blue/20 rounded-2xl flex items-center gap-3">
+                        <span class="material-symbols-outlined text-zatara-blue text-2xl">magic_button</span>
+                        <p class="text-zatara-blue font-bold">✨ أهلاً بك مجدداً يا {{ auth('customer')->user()->name }}، لقد قمنا بتسريع خطوات الحجز من أجلك!</p>
+                    </div>
+                @endif
+                        <div class="p-3 bg-zatara-red/10 border border-zatara-red/20 rounded-xl text-zatara-red text-sm font-medium animate-pulse">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                </div>
+
                 <form wire:submit.prevent="submitPassengers" class="space-y-8">
                     @foreach($form->passengers as $index => $passenger)
                         <div wire:key="passenger-item-{{ $index }}" class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative group transition-all hover:shadow-md">
@@ -135,10 +147,18 @@
                                 @endif
                             </div>
                             
-                            <h4 class="text-zatara-gold font-bold mb-6 text-lg flex items-center gap-2">
-                                <span class="material-symbols-outlined">person</span>
-                                مسافر #{{ $index + 1 }}
-                            </h4>
+                            <div class="flex items-center justify-between mb-6">
+                                <h4 class="text-zatara-gold font-bold text-lg flex items-center gap-2">
+                                    <span class="material-symbols-outlined">person</span>
+                                    مسافر #{{ $index + 1 }}
+                                </h4>
+                                @if($index === 0 && auth('customer')->check())
+                                    <button type="button" wire:click="autoFillPassenger" class="text-xs bg-zatara-blue/10 text-zatara-blue hover:bg-zatara-blue hover:text-white transition-all px-4 py-2 rounded-full font-bold flex items-center gap-1 shadow-sm">
+                                        <span class="material-symbols-outlined text-[16px]">account_circle</span>
+                                        👤 أنا أحد الركاب
+                                    </button>
+                                @endif
+                            </div>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div>
@@ -156,14 +176,14 @@
                                 </div>
                                 
                                 <div>
-                                    <label class="block text-xs font-bold text-zatara-blue mb-2">تاريخ الميلاد</label>
+                                    <label class="block text-xs font-bold text-zatara-blue mb-2">تاريخ الميلاد <span class="text-slate-400 font-normal">(اختياري)</span></label>
                                     <input type="date" wire:model="form.passengers.{{ $index }}.date_of_birth"
                                            class="glass-input w-full px-4 py-3 text-slate-800 transition-colors {{ $errors->has("form.passengers.{$index}.date_of_birth") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                     @error("form.passengers.{$index}.date_of_birth") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-bold text-zatara-blue mb-2">نوع الوثيقة</label>
+                                    <label class="block text-xs font-bold text-zatara-blue mb-2">نوع الوثيقة <span class="text-slate-400 font-normal">(اختياري)</span></label>
                                     <select wire:model="form.passengers.{{ $index }}.document_type"
                                             class="glass-input w-full px-4 py-3 text-slate-800 bg-white transition-colors {{ $errors->has("form.passengers.{$index}.document_type") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                         <option value="">اختر النوع...</option>
@@ -174,7 +194,7 @@
                                 </div>
 
                                 <div>
-                                    <label class="block text-xs font-bold text-zatara-blue mb-2">رقم الوثيقة</label>
+                                    <label class="block text-xs font-bold text-zatara-blue mb-2">رقم الوثيقة <span class="text-slate-400 font-normal">(اختياري)</span></label>
                                     <input type="text" wire:model="form.passengers.{{ $index }}.document_number" dir="ltr" placeholder="رقم الهوية/الجواز"
                                            class="glass-input w-full px-4 py-3 text-slate-800 transition-colors {{ $errors->has("form.passengers.{$index}.document_number") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                     @error("form.passengers.{$index}.document_number") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
@@ -216,27 +236,37 @@
                 </div>
 
                 <form wire:submit.prevent="submitAddons" class="space-y-4">
-                    @forelse($tripInstance->addons ?? [] as $addon)
-                        <label class="flex items-center justify-between p-5 bg-white border border-slate-100 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-md transition-all has-[:checked]:border-zatara-gold has-[:checked]:bg-zatara-gold/5">
-                            <div class="flex items-center gap-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        @forelse($tripInstance->addons ?? [] as $addon)
+                            <label class="relative flex flex-col p-6 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-xl hover:-translate-y-1 transition-all duration-300 has-[:checked]:border-zatara-gold has-[:checked]:bg-gradient-to-br has-[:checked]:from-zatara-gold/10 has-[:checked]:to-transparent overflow-hidden group">
                                 <input type="checkbox" wire:click="toggleAddon({{ $addon->id }})" 
                                        @if(collect($form->addons)->contains('trip_addon_id', $addon->id)) checked @endif
-                                       class="w-6 h-6 rounded-lg border-slate-300 text-zatara-gold focus:ring-zatara-gold/50 cursor-pointer">
-                                <div>
-                                    <span class="block font-bold text-zatara-blue text-lg">{{ $addon->name }}</span>
-                                    <span class="block text-sm text-slate-500 mt-1">{{ $addon->description ?? 'إضافة رائعة لرحلتك' }}</span>
+                                       class="absolute top-6 left-6 w-6 h-6 rounded-lg border-slate-300 text-zatara-gold focus:ring-zatara-gold/50 cursor-pointer">
+                                
+                                <div class="flex items-start gap-4 mb-4">
+                                    <div class="w-12 h-12 rounded-full bg-zatara-blue/5 flex items-center justify-center text-zatara-blue group-has-[:checked]:bg-zatara-gold group-has-[:checked]:text-white transition-colors">
+                                        <span class="material-symbols-outlined text-[24px]">verified</span>
+                                    </div>
+                                    <div>
+                                        <span class="block font-bold text-zatara-blue text-lg">{{ $addon->name }}</span>
+                                        <span class="block text-sm text-slate-500 mt-1 leading-relaxed">{{ $addon->description ?? 'إضافة رائعة تمنحك المزيد من الراحة والرفاهية خلال رحلتك.' }}</span>
+                                    </div>
                                 </div>
+                                
+                                <div class="mt-auto pt-4 border-t border-slate-100 group-has-[:checked]:border-zatara-gold/20 flex items-center justify-between">
+                                    <span class="text-sm font-bold text-slate-400 group-has-[:checked]:text-zatara-gold">التكلفة الإضافية</span>
+                                    <div class="font-black text-zatara-blue group-has-[:checked]:text-zatara-gold text-2xl">
+                                        +{{ number_format($addon->price) }} $
+                                    </div>
+                                </div>
+                            </label>
+                        @empty
+                            <div class="col-span-1 md:col-span-2 text-center py-16 bg-slate-50/50 backdrop-blur-sm rounded-3xl border border-dashed border-slate-200">
+                                <span class="material-symbols-outlined text-5xl text-slate-300 mb-4 block">category</span>
+                                <p class="text-slate-500 font-bold text-lg">لا توجد إضافات متاحة لهذه الرحلة حالياً.</p>
                             </div>
-                            <div class="font-black text-zatara-gold text-xl">
-                                +{{ number_format($addon->price) }} $
-                            </div>
-                        </label>
-                    @empty
-                        <div class="text-center py-12 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
-                            <span class="material-symbols-outlined text-4xl text-slate-300 mb-2">category</span>
-                            <p class="text-slate-500 font-medium">لا توجد إضافات متاحة لهذه الرحلة حالياً.</p>
-                        </div>
-                    @endforelse
+                        @endforelse
+                    </div>
 
                     <div class="flex justify-between pt-6 border-t border-slate-100 mt-10">
                         <button type="button" wire:click="$set('currentStep', 3)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">

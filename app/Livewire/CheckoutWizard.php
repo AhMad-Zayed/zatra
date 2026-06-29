@@ -66,6 +66,16 @@ class CheckoutWizard extends Component
         $this->form->addPassenger();
     }
 
+    public function autoFillPassenger()
+    {
+        if (Auth::guard('customer')->check()) {
+            $customer = Auth::guard('customer')->user();
+            $parts = explode(' ', trim($customer->name), 2);
+            $this->form->passengers[0]['first_name'] = $parts[0] ?? '';
+            $this->form->passengers[0]['last_name'] = $parts[1] ?? '';
+        }
+    }
+
     public function removePassenger($index)
     {
         $this->form->removePassenger($index);

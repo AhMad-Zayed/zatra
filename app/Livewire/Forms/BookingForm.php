@@ -34,9 +34,9 @@ class BookingForm extends Form
             'passengers' => ['required', 'array', 'min:1'],
             'passengers.*.first_name' => ['required', 'string', 'max:255'],
             'passengers.*.last_name' => ['required', 'string', 'max:255'],
-            'passengers.*.document_type' => ['required', 'string'],
-            'passengers.*.document_number' => ['required', 'string'],
-            'passengers.*.date_of_birth' => ['required', 'date'],
+            'passengers.*.document_type' => ['nullable', 'string'],
+            'passengers.*.document_number' => ['nullable', 'string'],
+            'passengers.*.date_of_birth' => ['nullable', 'date'],
             'passengers.*.trip_passenger_category_id' => [
                 'required',
                 'integer',
