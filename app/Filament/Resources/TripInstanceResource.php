@@ -49,15 +49,15 @@ class TripInstanceResource extends Resource
                             ->live()
                             ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
                                 if (! $state) {
-                                    $set('tripPricingTiers', []);
+                                    $set('tripPassengerCategories', []);
                                     $set('tripAddons', []);
                                     return;
                                 }
 
-                                $template = \App\Models\TripTemplate::with(['templatePricingTiers', 'templateAddons'])->find($state);
+                                $template = \App\Models\TripTemplate::with(['templatePassengerCategories', 'templateAddons'])->find($state);
 
                                 if ($template) {
-                                    $tiers = $template->templatePricingTiers->map(fn ($tier) => [
+                                    $tiers = $template->templatePassengerCategories->map(fn ($tier) => [
                                         'name' => $tier->name,
                                         'price' => $tier->price,
                                     ])->toArray();
@@ -68,7 +68,7 @@ class TripInstanceResource extends Resource
                                         'max_quantity' => $addon->max_quantity,
                                     ])->toArray();
 
-                                    $set('tripPricingTiers', $tiers);
+                                    $set('tripPassengerCategories', $tiers);
                                     $set('tripAddons', $addons);
                                 }
                             }),
@@ -96,7 +96,7 @@ class TripInstanceResource extends Resource
                 Forms\Components\Section::make('فئات التسعير الخاصة بهذا الموعد')
                     ->description('تم نسخ هذه الفئات من القالب تلقائياً، يمكنك تعديل أسعارها لهذا الموعد خصيصاً (مثال: أسعار العطلات).')
                     ->schema([
-                        Forms\Components\Repeater::make('tripPricingTiers')
+                        Forms\Components\Repeater::make('tripPassengerCategories')
                             ->relationship()
                             ->label('الفئات')
                             ->schema([
@@ -194,7 +194,7 @@ class TripInstanceResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\TripInstanceResource\RelationManagers\WaitingListsRelationManager::class,
         ];
     }
 

@@ -15,7 +15,7 @@ class BookingForm extends Form
     public $phone = '';
     public $otp = '';
 
-    // Array of passenger arrays: [['trip_pricing_tier_id' => X, 'dynamic_data' => [...]]]
+    // Array of passenger arrays: [['trip_passenger_category_id' => X, 'dynamic_data' => [...]]]
     public $passengers = [];
     
     // Array of addon arrays: [['trip_addon_id' => X, 'quantity' => Y]]
@@ -32,14 +32,19 @@ class BookingForm extends Form
             'otp' => ['nullable', 'string', 'size:6'],
             
             'passengers' => ['required', 'array', 'min:1'],
-            'passengers.*.trip_pricing_tier_id' => [
+            'passengers.*.first_name' => ['required', 'string', 'max:255'],
+            'passengers.*.last_name' => ['required', 'string', 'max:255'],
+            'passengers.*.document_type' => ['required', 'string'],
+            'passengers.*.document_number' => ['required', 'string'],
+            'passengers.*.date_of_birth' => ['required', 'date'],
+            'passengers.*.trip_passenger_category_id' => [
                 'required',
                 'integer',
-                Rule::exists('trip_pricing_tiers', 'id')->where(function ($query) {
+                Rule::exists('trip_passenger_categories', 'id')->where(function ($query) {
                     return $query->where('trip_instance_id', $this->trip_instance_id);
                 })
             ],
-            'passengers.*.dynamic_data' => ['nullable', 'array'],
+            'passengers.*.extra_preferences' => ['nullable', 'array'],
 
             'addons' => ['nullable', 'array'],
             'addons.*.trip_addon_id' => [
@@ -52,6 +57,21 @@ class BookingForm extends Form
             'addons.*.quantity' => ['required', 'integer', 'min:1'],
         ];
     }
+
+    public function messages()
+    {
+        return [
+            'phone.required' => 'رقم الجوال مطلوب.',
+            'phone.min' => 'رقم الجوال قصير جداً.',
+            'otp.size' => 'رمز التحقق يجب أن يتكون من 6 أرقام.',
+            'passengers.*.first_name.required' => 'الاسم الأول مطلوب.',
+            'passengers.*.last_name.required' => 'اسم العائلة مطلوب.',
+            'passengers.*.document_type.required' => 'نوع الوثيقة مطلوب.',
+            'passengers.*.document_number.required' => 'رقم الوثيقة مطلوب.',
+            'passengers.*.date_of_birth.required' => 'تاريخ الميلاد مطلوب.',
+            'passengers.*.trip_passenger_category_id.required' => 'يرجى اختيار باقة المسافر.',
+        ];
+    }
     
     public function setTripInstanceId($id)
     {
@@ -61,7 +81,7 @@ class BookingForm extends Form
     public function addPassenger()
     {
         $this->passengers[] = [
-            'trip_pricing_tier_id' => null,
+            'trip_passenger_category_id' => null,
             'dynamic_data' => []
         ];
     }

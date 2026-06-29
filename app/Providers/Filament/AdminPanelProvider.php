@@ -33,6 +33,10 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::Amber,
             ])
             ->tenant(Tenant::class)
+            ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
+            ->tenantMiddleware([
+                \App\Http\Middleware\ApplyTenantScopes::class,
+            ], isPersistent: true)
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
@@ -40,7 +44,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                \App\Filament\Widgets\StatsOverviewWidget::class,
+                \App\Filament\Widgets\DashboardStatsOverview::class,
+                \App\Filament\Widgets\BookingStatsWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

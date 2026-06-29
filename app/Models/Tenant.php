@@ -15,11 +15,26 @@ class Tenant extends Model
         'name',
         'slug',
         'domain',
+        'is_active',
         'is_visa_enabled',
+        'payment_gateway_provider',
+        'enable_email_alerts',
+        'enable_whatsapp_alerts',
+        'enable_sms_alerts',
+        'tourism_license_number',
+        'terms_conditions',
+        'privacy_policy',
+        'refund_policy',
+        'settings',
     ];
 
     protected $casts = [
-        'is_visa_enabled' => 'boolean',
+        'is_active' => 'boolean',
+        'cash_booking_expiry_hours' => 'integer',
+        'enable_email_alerts' => 'boolean',
+        'enable_whatsapp_alerts' => 'boolean',
+        'enable_sms_alerts' => 'boolean',
+        'settings' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -55,9 +70,9 @@ class Tenant extends Model
         return $this->hasMany(Payment::class);
     }
 
-    public function templatePricingTiers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function templatePassengerCategories(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(TemplatePricingTier::class);
+        return $this->hasMany(TemplatePassengerCategory::class);
     }
 
     public function templateAddons(): \Illuminate\Database\Eloquent\Relations\HasMany
@@ -65,9 +80,9 @@ class Tenant extends Model
         return $this->hasMany(TemplateAddon::class);
     }
 
-    public function globalPricingTiers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function passengerCategorys(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(GlobalPricingTier::class);
+        return $this->hasMany(PassengerCategory::class);
     }
 
     public function globalAddons(): \Illuminate\Database\Eloquent\Relations\HasMany

@@ -139,8 +139,8 @@ class TripInstancesRelationManager extends RelationManager
                                     'status' => 'active',
                                 ]);
 
-                                foreach ($ownerRecord->templatePricingTiers as $tier) {
-                                    $instance->tripPricingTiers()->create([
+                                foreach ($ownerRecord->templatePassengerCategories as $tier) {
+                                    $instance->tripPassengerCategories()->create([
                                         'tenant_id' => $ownerRecord->tenant_id,
                                         'name' => $tier->name,
                                         'price' => $tier->price,

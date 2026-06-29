@@ -113,14 +113,14 @@ class BookingService
             // Bypass observers
             DB::table('bookings')
                 ->where('id', $booking->id)
-                ->update(['status' => BookingStatus::CANCELLED->value]);
+                ->update(['booking_status' => BookingStatus::Cancelled->value]);
 
             activity()
                 ->performedOn($booking)
                 ->causedBy(auth()->user())
                 ->withProperties([
                     'old_status' => $oldStatus?->value,
-                    'new_status' => BookingStatus::CANCELLED->value,
+                    'new_status' => BookingStatus::Cancelled->value,
                     'reason' => $reason,
                 ])
                 ->log('booking_cancelled');
@@ -132,42 +132,41 @@ class BookingService
      */
     public function recalculateFinancialStatus(Booking $booking): void
     {
-        // Don't update if cancelled or completed
-        if (in_array($booking->status, [BookingStatus::CANCELLED, BookingStatus::COMPLETED])) {
+        // Don't update if cancelled
+        if ($booking->booking_status === BookingStatus::Cancelled) {
             return;
         }
 
         $paid = (float) $booking->payments()->sum('amount');
-        $total = (float) $booking->total_amount;
+        $total = (float) $booking->grand_total;
 
         // Derive status
         $newStatus = match (true) {
-            $paid <= 0 => BookingStatus::PENDING,
-            $paid >= $total => BookingStatus::PAID,
-            default => BookingStatus::PARTIAL,
+            $paid <= 0 => \App\Enums\PaymentStatus::Unpaid,
+            $paid >= $total => \App\Enums\PaymentStatus::Paid,
+            default => \App\Enums\PaymentStatus::PartiallyPaid,
         };
 
-        // Don't downgrade from confirmed to partial/pending unless required
-        if ($booking->status === BookingStatus::CONFIRMED) {
-            return;
-        }
-
-        if ($booking->status !== $newStatus) {
+        if ($booking->payment_status !== $newStatus) {
             DB::table('bookings')
                 ->where('id', $booking->id)
-                ->update(['status' => $newStatus->value]);
+                ->update(['payment_status' => $newStatus->value, 'total_paid' => $paid, 'balance_due' => max(0, $total - $paid)]);
 
-            if ($newStatus === BookingStatus::PAID || $newStatus === BookingStatus::CONFIRMED) {
-                $booking->user->notify(new \App\Notifications\BookingConfirmed($booking));
+            if ($newStatus === \App\Enums\PaymentStatus::Paid) {
+                // If it becomes fully paid, we might want to automatically confirm the booking
+                if ($booking->booking_status === BookingStatus::Pending) {
+                    DB::table('bookings')->where('id', $booking->id)->update(['booking_status' => BookingStatus::Confirmed->value]);
+                    $booking->refresh();
+                }
             }
 
             activity()
                 ->performedOn($booking)
                 ->withProperties([
-                    'old' => $booking->status?->value,
+                    'old' => $booking->payment_status?->value,
                     'new' => $newStatus->value,
                 ])
-                ->log('booking_status_recalculated');
+                ->log('payment_status_recalculated');
         }
     }
 

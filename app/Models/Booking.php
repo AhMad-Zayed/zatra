@@ -17,28 +17,40 @@ class Booking extends Model
     protected $fillable = [
         'tenant_id',
         'trip_instance_id',
+        'customer_id',
         'user_id',
+        'pnr',
+        'uuid',
         'booking_status',
         'payment_status',
         'grand_total',
         'total_paid',
         'balance_due',
         'notes',
+        'expires_at',
     ];
 
     protected $casts = [
         'booking_status' => BookingStatus::class,
         'payment_status' => PaymentStatus::class,
-        'grand_total' => 'decimal:2',
-        'total_paid' => 'decimal:2',
-        'balance_due' => 'decimal:2',
+        'grand_total' => \App\Casts\MoneyCast::class,
+        'total_paid' => \App\Casts\MoneyCast::class,
+        'balance_due' => \App\Casts\MoneyCast::class,
+        'expires_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
         static::creating(function ($model) {
-            if (auth()->check()) {
+            if (auth()->check() && !\Filament\Facades\Filament::getTenant()) {
+                // Keep this as fallback if needed for admins
+            } else {
                 $model->tenant_id ??= \Filament\Facades\Filament::getTenant()?->id;
+            }
+
+            // Auto-generate UUID
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
             }
         });
     }
@@ -56,6 +68,11 @@ class Booking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function passengers(): HasMany

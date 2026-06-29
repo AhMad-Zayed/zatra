@@ -22,6 +22,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         'phone',
         'email',
         'password',
+        'is_super_admin',
     ];
 
     protected $hidden = [
@@ -54,6 +55,10 @@ class User extends Authenticatable implements HasTenants, FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->roles()->exists();
+        if ($panel->getId() === 'superadmin') {
+            return $this->is_super_admin === true;
+        }
+
+        return $this->tenants()->exists();
     }
 }

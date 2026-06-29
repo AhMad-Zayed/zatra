@@ -16,4 +16,18 @@ class ListBookings extends ListRecords
             Actions\CreateAction::make(),
         ];
     }
+
+    public function getTabs(): array
+    {
+        return [
+            'all' => \Filament\Resources\Components\Tab::make('الكل (All)'),
+            'cancellation_requests' => \Filament\Resources\Components\Tab::make('طلبات الإلغاء (Cancellation Requests)')
+                ->badge(\App\Models\Booking::whereNotNull('cancellation_requested_at')
+                    ->where('booking_status', '!=', \App\Enums\BookingStatus::Cancelled)
+                    ->count())
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $query) => $query->whereNotNull('cancellation_requested_at')
+                    ->where('booking_status', '!=', \App\Enums\BookingStatus::Cancelled)),
+        ];
+    }
 }

@@ -21,6 +21,11 @@ class GlobalAddonResource extends Resource
     
     protected static ?string $navigationGroup = 'القواميس والإعدادات';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasRole('agency_admin') ?? false;
+    }
+
     public static function getNavigationLabel(): string
     {
         return 'مكتبة الإضافات';

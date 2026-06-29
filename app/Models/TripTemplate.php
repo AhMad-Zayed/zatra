@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class TripTemplate extends Model
+class TripTemplate extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'tenant_id',
@@ -21,7 +23,7 @@ class TripTemplate extends Model
     ];
 
     protected $casts = [
-        'base_price' => 'decimal:2',
+        'base_price' => \App\Casts\MoneyCast::class,
         'passenger_requirements' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -38,9 +40,9 @@ class TripTemplate extends Model
         return $this->hasMany(TripInstance::class);
     }
 
-    public function templatePricingTiers(): HasMany
+    public function templatePassengerCategories(): HasMany
     {
-        return $this->hasMany(TemplatePricingTier::class);
+        return $this->hasMany(TemplatePassengerCategory::class);
     }
 
     public function templateAddons(): HasMany

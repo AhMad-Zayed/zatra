@@ -3,11 +3,11 @@
 namespace App\Livewire;
 
 use Livewire\Component;
-use Livewire\WithPagination;
 use App\Models\Tenant;
 use App\Models\TripInstance;
-use Illuminate\Support\Facades\View;
 use Livewire\Attributes\Layout;
+
+use Livewire\WithPagination;
 
 #[Layout('components.layouts.storefront')]
 class StorefrontCatalog extends Component
@@ -23,15 +23,15 @@ class StorefrontCatalog extends Component
 
     public function render()
     {
-        // Enforce strict eager loading and pagination as requested
-        $trips = TripInstance::where('tenant_id', $this->tenant->id)
-            ->where('status', 'upcoming') // Assuming status enum or active flag, we'll just pull upcoming ones, or just available ones
-            ->with(['tripTemplate', 'tripPricingTiers'])
+        $tripInstances = TripInstance::where('tenant_id', $this->tenant->id)
+            ->where('status', 'active')
+            ->with(['tripTemplate', 'tripPassengerCategories'])
             ->orderBy('start_date', 'asc')
-            ->paginate(12);
+            ->paginate(9);
 
         return view('livewire.storefront-catalog', [
-            'trips' => $trips,
+            'tripInstances' => $tripInstances,
+            'tenant' => $this->tenant,
         ]);
     }
 }

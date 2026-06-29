@@ -13,21 +13,29 @@ use Exception;
 class CustomerOtpService
 {
     /**
-     * Send an OTP to a customer.
-     * Includes 15-minute cool-down check and generation rate limiting.
+     * Sanitize phone number (strip spaces, dashes, formatting).
      */
-    public function sendOtp(Tenant $tenant, string $phone): void
+    private function sanitizePhone(string $phone): string
     {
-        $verificationKey = "otp_verification:{$tenant->id}:{$phone}";
-        $generationKey = "otp_generation:{$tenant->id}:{$phone}";
+        return preg_replace('/[^0-9+]/', '', $phone);
+    }
 
-        // 1. Check if the user is in a 15-minute cool-down from failing verification
+    /**
+     * Send an OTP to a customer (Email or Phone).
+     */
+    public function sendOtp(Tenant $tenant, string $identifier): void
+    {
+        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+        $cleanIdentifier = $isEmail ? strtolower(trim($identifier)) : $this->sanitizePhone($identifier);
+
+        $verificationKey = "otp_verification:{$tenant->id}:{$cleanIdentifier}";
+        $generationKey = "otp_generation:{$tenant->id}:{$cleanIdentifier}";
+
         if (RateLimiter::tooManyAttempts($verificationKey, 5)) {
             $secondsRemaining = RateLimiter::availableIn($verificationKey);
             throw new OtpCoolDownException($secondsRemaining, "Account in cool-down due to too many failed attempts.");
         }
 
-        // 2. Check Generation Rate Limit (max 3 OTPs generated per 15 mins)
         if (RateLimiter::tooManyAttempts($generationKey, 3)) {
             $secondsRemaining = RateLimiter::availableIn($generationKey);
             throw new OtpCoolDownException($secondsRemaining, "Too many OTP requests. Please wait.");
@@ -35,58 +43,62 @@ class CustomerOtpService
 
         RateLimiter::hit($generationKey, 15 * 60); // 15 mins decay
 
-        // 3. Generate Cryptographically Secure OTP
         $otp = (string) random_int(100000, 999999);
 
-        // 4. Find or Create Customer
+        // Find or Create Customer
+        $field = $isEmail ? 'email' : 'phone';
         $customer = Customer::firstOrCreate(
-            ['tenant_id' => $tenant->id, 'phone' => $phone]
+            ['tenant_id' => $tenant->id, $field => $cleanIdentifier]
         );
 
-        // 5. Hash and Store OTP
         $customer->update([
             'otp_code' => Hash::make($otp),
             'otp_expires_at' => now()->addMinutes(10),
         ]);
 
-        // 6. TODO: Dispatch SMS/WhatsApp Job
-        // \Illuminate\Support\Facades\Log::info("OTP for {$phone} is {$otp}");
+        // Dispatch appropriate Notification
+        if (app()->environment('production', 'staging')) {
+            // TODO: Implement a proper SendCustomerNotificationJob for OTPs
+            // \App\Jobs\SendCustomerNotificationJob::dispatch($customer, $isEmail ? 'email' : 'whatsapp', "Your authentication code is {$otp}");
+            \Illuminate\Support\Facades\Log::info("Production OTP for {$field} {$cleanIdentifier}: {$otp}");
+        } else {
+            \Illuminate\Support\Facades\Log::info("Local/Testing OTP for {$field} {$cleanIdentifier}: {$otp}");
+        }
     }
 
     /**
      * Verify an OTP.
-     * Enforces strict rate limiting and prevents replay attacks.
      */
-    public function verifyOtp(Tenant $tenant, string $phone, string $otpInput): Customer
+    public function verifyOtp(Tenant $tenant, string $identifier, string $otpInput): Customer
     {
-        $verificationKey = "otp_verification:{$tenant->id}:{$phone}";
+        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+        $cleanIdentifier = $isEmail ? strtolower(trim($identifier)) : $this->sanitizePhone($identifier);
 
-        // 1. Check Cool-down
+        $verificationKey = "otp_verification:{$tenant->id}:{$cleanIdentifier}";
+
         if (RateLimiter::tooManyAttempts($verificationKey, 5)) {
             $secondsRemaining = RateLimiter::availableIn($verificationKey);
             throw new OtpCoolDownException($secondsRemaining, "Account locked. Try again later.");
         }
 
-        $customer = Customer::where('tenant_id', $tenant->id)->where('phone', $phone)->first();
+        $field = $isEmail ? 'email' : 'phone';
+        $customer = Customer::where('tenant_id', $tenant->id)->where($field, $cleanIdentifier)->first();
 
         if (!$customer || !$customer->otp_code || !$customer->otp_expires_at) {
-            RateLimiter::hit($verificationKey, 15 * 60); // 15 mins
+            RateLimiter::hit($verificationKey, 15 * 60);
             throw new InvalidOtpException("Invalid or expired OTP.");
         }
 
-        // 2. Check Expiration
         if (now()->isAfter($customer->otp_expires_at)) {
             RateLimiter::hit($verificationKey, 15 * 60);
             throw new InvalidOtpException("OTP has expired.");
         }
 
-        // 3. Secure Hash Comparison
         if (!Hash::check($otpInput, $customer->otp_code)) {
             RateLimiter::hit($verificationKey, 15 * 60);
             throw new InvalidOtpException("Invalid OTP.");
         }
 
-        // 4. SUCCESS: Clear Verification Attempts & Prevent Replay Attack
         RateLimiter::clear($verificationKey);
         
         $customer->update([

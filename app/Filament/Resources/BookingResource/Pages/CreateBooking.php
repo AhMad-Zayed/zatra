@@ -34,7 +34,7 @@ class CreateBooking extends CreateRecord
         if (isset($data['passengers'])) {
             foreach ($data['passengers'] as $p) {
                 $passengersData[] = [
-                    'trip_pricing_tier_id' => $p['trip_pricing_tier_id'],
+                    'trip_passenger_category_id' => $p['trip_passenger_category_id'],
                     'dynamic_data' => $p['dynamic_data'] ?? null,
                 ];
             }

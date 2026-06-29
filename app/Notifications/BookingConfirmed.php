@@ -21,7 +21,18 @@ class BookingConfirmed extends Notification
 
     public function via(object $notifiable): array
     {
-        return [WhatsAppChannel::class];
+        return ['mail', WhatsAppChannel::class];
+    }
+
+    public function toMail(object $notifiable)
+    {
+        $ref = $this->booking->pnr ?? $this->booking->reference ?? '';
+        return (new \Illuminate\Notifications\Messages\MailMessage)
+            ->subject("تأكيد الحجز - {$ref}")
+            ->view('mail.booking-confirmed', [
+                'booking' => $this->booking,
+                'tenant' => $this->booking->tenant,
+            ]);
     }
 
     public function toWhatsApp(object $notifiable): WhatsAppMessage

@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@theme {
+  --color-zatara-blue: #2B3280;
+  --color-zatara-gold: #F4A93F;
+  --color-zatara-red: #A13D44;
+  
+  --font-arabic: 'Tajawal', 'Cairo', sans-serif;
+  --font-english: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+
+  --animate-slowPan: slowPan 30s infinite alternate ease-in-out;
+}
+
+@keyframes slowPan {
+  0% { transform: scale(1.05) translate(0, 0); }
+  100% { transform: scale(1.1) translate(-2%, 2%); }
+}
+
+@layer utilities {
+    .glass-panel {
+        @apply bg-white/70 backdrop-blur-[24px] border border-white/60 shadow-[0_8px_32px_0_rgba(43,50,128,0.07)] relative overflow-hidden;
+    }
+    .glass-panel::before {
+        content: '';
+        @apply absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/40 to-transparent pointer-events-none;
+    }
+    .glass-input {
+        @apply bg-white/50 backdrop-blur-md border border-[#2B3280]/10 focus:bg-white focus:border-zatara-gold focus:ring-4 focus:ring-zatara-gold/10 focus:rounded-2xl shadow-inner transition-all duration-300;
+    }
+    .flight-path {
+        @apply h-[2px] bg-gradient-to-r from-zatara-gold via-zatara-blue to-transparent rounded-full opacity-50;
+    }
+    .btn-primary {
+        @apply bg-gradient-to-r from-zatara-blue to-[#3a44a1] text-white rounded-2xl px-6 py-3 font-bold transition-all duration-300 hover:shadow-[0_10px_30px_rgba(43,50,128,0.4)] hover:-translate-y-1 relative overflow-hidden;
+    }
+    .btn-primary::after {
+        content: '';
+        @apply absolute top-0 left-[-100%] w-[50%] h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[45deg] transition-all duration-700;
+    }
+    .btn-primary:hover::after {
+        @apply left-[200%];
+    }
+    .btn-secondary {
+        @apply bg-gradient-to-r from-zatara-gold to-[#f5b85e] text-[#1a1a1a] rounded-2xl px-6 py-3 font-bold transition-all duration-300 hover:shadow-[0_10px_30px_rgba(244,169,63,0.4)] hover:-translate-y-1 relative overflow-hidden;
+    }
+    
+    /* Premium Animations */
+    .animate-float {
+        animation: float 6s ease-in-out infinite;
+    }
+    .animate-fade-up {
+        animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .hover-glow:hover {
+        box-shadow: 0 0 40px rgba(244, 169, 63, 0.2), inset 0 0 20px rgba(255, 255, 255, 0.5);
+    }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+}
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}

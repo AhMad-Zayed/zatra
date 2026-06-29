@@ -23,9 +23,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Illuminate\Database\Eloquent\Model::unguard();
-        
         Payment::observe(PaymentObserver::class);
         Booking::observe(BookingObserver::class);
+
+        \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
+            return $user->is_super_admin ? true : null;
+        });
     }
 }

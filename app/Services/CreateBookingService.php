@@ -7,7 +7,7 @@ use App\Models\Passenger;
 use App\Models\BookingAddon;
 use App\Models\TripInstance;
 use App\Models\TripAddon;
-use App\Models\TripPricingTier;
+use App\Models\TripPassengerCategory;
 use App\Exceptions\InventoryExhaustedException;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
@@ -60,12 +60,19 @@ class CreateBookingService
                 }
             }
 
+            // Generate a unique PNR
+            $pnr = 'ZTR-' . strtoupper(\Illuminate\Support\Str::random(6));
+            while (Booking::where('pnr', $pnr)->exists()) {
+                $pnr = 'ZTR-' . strtoupper(\Illuminate\Support\Str::random(6));
+            }
+
             // 3. Create the Booking Record (Owner is Customer, Creator is optional User)
             $booking = Booking::create([
                 'tenant_id' => $tenantId,
                 'trip_instance_id' => $tripInstanceId,
                 'customer_id' => $customerId, // The actual owner of the booking
                 'user_id' => $creatorUserId, // Audit trail: The Admin who created this (Null for self-checkout)
+                'pnr' => $pnr,
                 'booking_status' => BookingStatus::Pending,
                 'payment_status' => PaymentStatus::Unpaid,
                 'notes' => $notes,
@@ -75,16 +82,21 @@ class CreateBookingService
 
             // 4. Process Passengers
             foreach ($passengersData as $pData) {
-                $tier = TripPricingTier::where('id', $pData['trip_pricing_tier_id'])
+                $tier = TripPassengerCategory::where('id', $pData['trip_passenger_category_id'])
                             ->where('trip_instance_id', $tripInstanceId)
                             ->firstOrFail();
                             
                 Passenger::create([
                     'tenant_id' => $tenantId,
                     'booking_id' => $booking->id,
-                    'trip_pricing_tier_id' => $tier->id,
+                    'trip_passenger_category_id' => $tier->id,
                     'price_at_booking' => $tier->price,
-                    'dynamic_data' => $pData['dynamic_data'] ?? null,
+                    'first_name' => $pData['first_name'] ?? null,
+                    'last_name' => $pData['last_name'] ?? null,
+                    'document_type' => $pData['document_type'] ?? null,
+                    'document_number' => $pData['document_number'] ?? null,
+                    'date_of_birth' => $pData['date_of_birth'] ?? null,
+                    'extra_preferences' => is_array($pData['extra_preferences'] ?? null) ? $pData['extra_preferences'] : [],
                 ]);
                 
                 $totalAmount += $tier->price;
@@ -126,6 +138,9 @@ class CreateBookingService
                 'grand_total' => $totalAmount,
                 'balance_due' => $totalAmount,
             ]);
+
+            // Dispatch Event for Background Notifications
+            event(new \App\Events\BookingCreated($booking));
 
             return $booking;
         });

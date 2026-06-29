@@ -14,6 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant.customer' => \App\Http\Middleware\TenantCustomerMiddleware::class,
         ]);
+        
+        // Phase 6: Exempt Payment Webhooks from CSRF
+        $middleware->validateCsrfTokens(except: [
+            'api/webhooks/*',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

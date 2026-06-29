@@ -6,22 +6,31 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Passenger extends Model
+class Passenger extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'tenant_id',
         'booking_id',
-        'trip_pricing_tier_id',
+        'trip_passenger_category_id',
         'price_at_booking',
-        'dynamic_data',
+        'first_name',
+        'last_name',
+        'document_type',
+        'document_number',
+        'date_of_birth',
+        'gender',
+        'extra_preferences',
     ];
 
     protected $casts = [
         'price_at_booking' => 'decimal:2',
-        'dynamic_data' => 'array',
+        'date_of_birth' => 'date',
+        'extra_preferences' => 'array',
     ];
 
     protected static function booted(): void
@@ -31,6 +40,13 @@ class Passenger extends Model
                 $model->tenant_id ??= \Filament\Facades\Filament::getTenant()?->id;
             }
         });
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('identity_documents')
+             ->useDisk('private')
+             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'application/pdf']);
     }
 
     public function tenant(): BelongsTo
@@ -43,8 +59,8 @@ class Passenger extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    public function tripPricingTier(): BelongsTo
+    public function tripPassengerCategory(): BelongsTo
     {
-        return $this->belongsTo(TripPricingTier::class);
+        return $this->belongsTo(TripPassengerCategory::class, 'trip_passenger_category_id');
     }
 }

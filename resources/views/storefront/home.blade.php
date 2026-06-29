@@ -132,10 +132,16 @@
                                         ${{ number_format($instance->tripTemplate->base_price, 2) }}
                                     </span>
                                 </div>
-                                <a href="{{ route('storefront.checkout', ['tenant_slug' => \Illuminate\Support\Str::slug($tenant->name), 'instance' => $instance->id]) }}" 
-                                   class="inline-flex items-center justify-center px-6 h-12 text-sm font-bold text-white bg-primary-600 rounded-2xl hover:bg-primary-700 transition-colors">
-                                    احجز الآن
-                                </a>
+                                @if($instance->remaining_seats > 0)
+                                    <a href="{{ route('storefront.checkout', ['tenant' => $tenant->slug, 'tripInstance' => $instance->id]) }}" 
+                                       class="inline-flex items-center justify-center px-6 h-12 text-sm font-bold text-white bg-primary-600 rounded-2xl hover:bg-primary-700 transition-colors">
+                                        احجز الآن
+                                    </a>
+                                @else
+                                    <span class="inline-flex items-center justify-center px-6 h-12 text-sm font-bold text-slate-500 bg-slate-200 rounded-2xl cursor-not-allowed">
+                                        مكتملة العدد
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     </article>

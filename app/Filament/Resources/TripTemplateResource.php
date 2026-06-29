@@ -58,13 +58,13 @@ class TripTemplateResource extends Resource
                 Forms\Components\Section::make('فئات التسعير (Pricing Tiers)')
                     ->description('تحديد أسعار مختلفة بناءً على الفئة (بالغ، طفل، إلخ). سيتم نسخها لأي موعد جديد.')
                     ->schema([
-                        Forms\Components\Repeater::make('templatePricingTiers')
+                        Forms\Components\Repeater::make('templatePassengerCategories')
                             ->relationship()
                             ->label('الفئات')
                             ->schema([
                                 Forms\Components\Select::make('global_pricing_tier_id')
                                     ->label('استيراد من المكتبة')
-                                    ->relationship('globalPricingTier', 'name')
+                                    ->relationship('passengerCategory', 'name')
                                     ->searchable()
                                     ->preload()
                                     ->createOptionForm([
@@ -81,7 +81,7 @@ class TripTemplateResource extends Resource
                                     ->live()
                                     ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
                                         if ($state) {
-                                            $global = \App\Models\GlobalPricingTier::find($state);
+                                            $global = \App\Models\PassengerCategory::find($state);
                                             if ($global) {
                                                 $set('name', $global->name);
                                                 $set('price', $global->default_price);

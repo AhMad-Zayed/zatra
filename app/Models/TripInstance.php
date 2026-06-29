@@ -7,10 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Enums\TripStatusEnum;
+use App\Traits\HasTripState;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class TripInstance extends Model
+class TripInstance extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasTripState, InteractsWithMedia;
 
     protected $fillable = [
         'tenant_id',
@@ -25,6 +29,7 @@ class TripInstance extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'available_seats' => 'integer',
+        'status' => TripStatusEnum::class,
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -45,13 +50,27 @@ class TripInstance extends Model
         return $this->hasMany(Booking::class);
     }
 
-    public function tripPricingTiers(): HasMany
+    public function tripPassengerCategories(): HasMany
     {
-        return $this->hasMany(TripPricingTier::class);
+        return $this->hasMany(TripPassengerCategory::class);
     }
 
     public function tripAddons(): HasMany
     {
         return $this->hasMany(TripAddon::class);
+    }
+
+    public function getRemainingSeatsAttribute(): int
+    {
+        if ($this->available_seats === null) {
+            return PHP_INT_MAX;
+        }
+
+        $currentBooked = \App\Models\Passenger::whereHas('booking', function ($q) {
+            $q->where('trip_instance_id', $this->id)
+              ->whereIn('booking_status', [\App\Enums\BookingStatus::Confirmed, \App\Enums\BookingStatus::Pending]);
+        })->count();
+
+        return max(0, $this->available_seats - $currentBooked);
     }
 }
