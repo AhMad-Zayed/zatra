@@ -8,4 +8,11 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote')->hourly();
 
-Schedule::command('bookings:release-expired')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('app:release-expired-holds')->everyFiveMinutes()->withoutOverlapping();
+
+// Automation Engine
+Schedule::job(new \App\Jobs\AbandonedCartRecovery)->everyThirtyMinutes();
+Schedule::job(new \App\Jobs\YieldPricingJob)->hourly();
+Schedule::job(new \App\Jobs\PreDepartureReminder)->dailyAt('20:00');
+Schedule::job(new \App\Jobs\AutoManifestDistribution)->dailyAt('20:00');
+Schedule::job(new \App\Jobs\PostTripReviewRequest)->dailyAt('10:00');

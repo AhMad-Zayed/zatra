@@ -16,8 +16,9 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class TripTemplateResource extends Resource
 {
     protected static ?string $model = TripTemplate::class;
-
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
+
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function getNavigationLabel(): string
     {
@@ -50,6 +51,20 @@ class TripTemplateResource extends Resource
                             ->required()
                             ->prefix('$')
                             ->helperText('هذا السعر يظهر للواجهة، يمكن تغييره لكل موعد رحلة.'),
+                            
+                        Forms\Components\Toggle::make('deposit_enabled')
+                            ->label('تفعيل الدفع الجزئي (عربون)')
+                            ->live()
+                            ->default(false),
+                            
+                        Forms\Components\TextInput::make('deposit_percentage')
+                            ->label('نسبة العربون (%)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(100)
+                            ->suffix('%')
+                            ->visible(fn (Forms\Get $get) => $get('deposit_enabled')),
+                            
                         Forms\Components\MarkdownEditor::make('description')
                             ->label('الوصف والتفاصيل')
                             ->columnSpanFull(),
@@ -158,8 +173,23 @@ class TripTemplateResource extends Resource
                     ]),
 
                 Forms\Components\Section::make('متطلبات المسافرين (Dynamic Form)')
-                    ->description('بناء النموذج الذي سيراه العميل لكل مسافر (مثل طلب صورة الجواز، رقم الهوية).')
+                    ->description('بناء النموذج الذي سيراه العميل لكل مسافر (مثل طلب صورة الجواز، رقم الهوية). يمكنك اختيار قالب جاهز بدلاً من الإدخال اليدوي.')
                     ->schema([
+                        Forms\Components\Select::make('requirement_preset_id')
+                            ->label('قالب المتطلبات الجاهز')
+                            ->relationship('requirementPreset', 'title')
+                            ->searchable()
+                            ->preload()
+                            ->live()
+                            ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
+                                if ($state) {
+                                    $preset = \App\Models\RequirementPreset::find($state);
+                                    if ($preset) {
+                                        $set('passenger_requirements', $preset->items);
+                                    }
+                                }
+                            }),
+
                         Forms\Components\Repeater::make('passenger_requirements')
                             ->label('الحقول المطلوبة')
                             ->schema([

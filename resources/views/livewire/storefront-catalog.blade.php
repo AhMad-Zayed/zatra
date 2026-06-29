@@ -113,8 +113,12 @@
                                 <span class="text-sm font-bold text-zatara-blue">{{ $instance->tripTemplate->duration_days ?? 5 }} أيام / {{ ($instance->tripTemplate->duration_days ?? 5) - 1 }} ليالٍ</span>
                             </div>
 
-                            {{-- Seats Tag --}}
-                            @if($instance->remaining_seats <= 10 && $instance->remaining_seats > 0)
+                            {{-- Seats Tag & Yield Pricing Badge --}}
+                            @if($instance->price_override)
+                                <div class="absolute top-4 right-4 bg-orange-100/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-orange-700 z-10 border border-orange-200 shadow-sm animate-pulse flex items-center gap-1">
+                                    <span>🔥</span> آخر المقاعد - تم تحديث السعر
+                                </div>
+                            @elseif($instance->remaining_seats <= 10 && $instance->remaining_seats > 0)
                                 <div class="absolute top-4 right-4 bg-rose-100/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-rose-700 z-10 border border-rose-200 shadow-sm animate-pulse">
                                     ⏳ أسرع! متبقي {{ $instance->remaining_seats }} مقاعد فقط
                                 </div>
@@ -144,7 +148,7 @@
                                 <div>
                                     <p class="text-xs text-slate-400 mb-0.5">تبدأ من</p>
                                     <div class="text-xl font-black text-zatara-blue">
-                                        {{ number_format($instance->tripPassengerCategories->min('price') ?? $instance->tripTemplate->base_price) }} <span class="text-sm font-medium">دولار</span>
+                                        {{ number_format(($instance->tripPassengerCategories->min('price') ?? $instance->tripTemplate->base_price) + ($instance->price_override ? $instance->price_override_amount : 0)) }} <span class="text-sm font-medium">دولار</span>
                                     </div>
                                 </div>
                                 @if($instance->remaining_seats > 0)

@@ -50,12 +50,15 @@ class ViewBooking extends ViewRecord
                 ])
                 ->action(function (array $data, $record) {
                     DB::transaction(function () use ($data, $record) {
+                        // Pessimistic lock to prevent race conditions during payment
+                        $record = \App\Models\Booking::lockForUpdate()->find($record->id);
+
                         // Create Payment
                         $record->payments()->create([
                             'tenant_id' => $record->tenant_id,
                             'amount' => $data['amount'],
                             'payment_method' => $data['payment_method'],
-                            'reference_note' => $data['reference_note'],
+                            'reference_note' => $data['reference_note'] ?? null,
                         ]);
 
                         // Update Ledger

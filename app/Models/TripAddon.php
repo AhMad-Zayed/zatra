@@ -20,7 +20,7 @@ class TripAddon extends Model
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
+        'price' => \App\Casts\MoneyCast::class,
         'max_quantity' => 'integer',
     ];
 

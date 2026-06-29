@@ -20,7 +20,7 @@ class PassengerCategory extends Model
     ];
 
     protected $casts = [
-        'default_price' => 'decimal:2',
+        'default_price' => \App\Casts\MoneyCast::class,
     ];
 
     protected static function booted(): void

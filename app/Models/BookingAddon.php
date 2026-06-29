@@ -14,13 +14,14 @@ class BookingAddon extends Model
     protected $fillable = [
         'tenant_id',
         'booking_id',
+        'passenger_id',
         'trip_addon_id',
         'quantity',
         'price_at_booking',
     ];
 
     protected $casts = [
-        'price_at_booking' => 'decimal:2',
+        'price_at_booking' => \App\Casts\MoneyCast::class,
         'quantity' => 'integer',
     ];
 
@@ -46,5 +47,10 @@ class BookingAddon extends Model
     public function tripAddon(): BelongsTo
     {
         return $this->belongsTo(TripAddon::class);
+    }
+
+    public function passenger(): BelongsTo
+    {
+        return $this->belongsTo(Passenger::class);
     }
 }

@@ -161,6 +161,31 @@ class BookingResource extends Resource
                                 Forms\Components\Repeater::make('bookingAddons')
                                     ->relationship()
                                     ->schema([
+                                        Forms\Components\Select::make('passenger_id')
+                                            ->label('المسافر (اختياري)')
+                                            ->options(function (Forms\Get $get) {
+                                                // Load from the state of the form
+                                                $passengers = $get('../../passengers') ?? [];
+                                                $options = [];
+                                                foreach ($passengers as $key => $p) {
+                                                    $name = ($p['dynamic_data']['first_name'] ?? 'مسافر') . ' ' . ($p['dynamic_data']['last_name'] ?? '');
+                                                    $options[$key] = $name; // Filament repeater keys are UUIDs, not DB IDs unless saved
+                                                }
+                                                // Actually, it's safer to query the DB if editing, or rely on the relationship if available.
+                                                // Since it's a relationship repeater, we can just load the actual passengers.
+                                                // Wait, if it's creating, the passengers don't have IDs yet. So linking by ID might fail.
+                                                // Let's query if booking exists.
+                                                $bookingId = $get('../../id');
+                                                if ($bookingId) {
+                                                    return \App\Models\Passenger::where('booking_id', $bookingId)
+                                                        ->get()
+                                                        ->mapWithKeys(fn ($p) => [$p->id => $p->first_name . ' ' . $p->last_name]);
+                                                }
+                                                return [];
+                                            })
+                                            ->searchable()
+                                            ->disabledOn('edit'),
+
                                         Forms\Components\Select::make('trip_addon_id')
                                             ->label('الإضافة')
                                             ->options(function (Forms\Get $get) {
@@ -386,6 +411,50 @@ class BookingResource extends Resource
                             ->send();
                     }),
                     
+                Tables\Actions\Action::make('collect_balance')
+                    ->label('تحصيل الرصيد المتبقي')
+                    ->icon('heroicon-o-currency-dollar')
+                    ->color('info')
+                    ->requiresConfirmation()
+                    ->modalHeading('استلام الرصيد المتبقي')
+                    ->modalDescription('هل أنت متأكد من استلام باقي المبلغ؟ سيتم تغيير حالة الحجز إلى مؤكد.')
+                    ->visible(fn (Booking $record) => $record->booking_status === \App\Enums\BookingStatus::ConfirmedPartial && $record->balance_due > 0)
+                    ->action(function (Booking $record) {
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($record) {
+                            $balance = $record->balance_due;
+                            $record->update([
+                                'booking_status' => \App\Enums\BookingStatus::Confirmed,
+                                'payment_status' => \App\Enums\PaymentStatus::Paid,
+                                'total_paid' => $record->grand_total,
+                            ]);
+
+                            // Create payment ledger entry for the remaining balance
+                            $record->payments()->create([
+                                'tenant_id' => $record->tenant_id,
+                                'amount' => $balance,
+                                'payment_method' => 'cash',
+                                'status' => 'completed',
+                                'transaction_id' => 'BALANCE-' . time(),
+                                'paid_at' => now(),
+                            ]);
+
+                            // Trigger Final Notification
+                            $message = "تم استلام الرصيد المتبقي بنجاح وتأكيد حجزك النهائي برقم {$record->pnr}.";
+                            
+                            if ($record->customer && $record->customer->phone) {
+                                \App\Jobs\SendBookingNotificationJob::dispatch($record, 'whatsapp', $message);
+                            }
+                            if ($record->customer && $record->customer->email) {
+                                \App\Jobs\SendBookingNotificationJob::dispatch($record, 'email', $message);
+                            }
+                        });
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('تم تحصيل الرصيد بنجاح')
+                            ->success()
+                            ->send();
+                    }),
+                    
                 Tables\Actions\Action::make('process_cancellation')
                     ->label('معالجة الإلغاء')
                     ->icon('heroicon-o-x-circle')
@@ -412,6 +481,14 @@ class BookingResource extends Resource
                                 'booking_status' => \App\Enums\BookingStatus::Cancelled,
                                 'cancellation_requested_at' => null,
                                 'notes' => trim($note),
+                            ]);
+
+                            \App\Models\InventoryLedger::create([
+                                'trip_instance_id' => $record->trip_instance_id,
+                                'booking_id'       => $record->id,
+                                'quantity'         => $record->passengers()->count(), // positive = returning seats
+                                'type'             => 'cancellation_reversal',
+                                'expires_at'       => null,
                             ]);
 
                             \App\Jobs\ProcessWaitingListJob::dispatch($record->tripInstance);

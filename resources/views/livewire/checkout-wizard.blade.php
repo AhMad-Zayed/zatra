@@ -14,7 +14,6 @@
             <div class="mt-10 flex justify-center items-center gap-2 max-w-2xl mx-auto" x-show="step < 6">
                 <template x-for="i in 5" :key="i">
                     <div class="flex items-center">
-                        <!-- Circle -->
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-sm"
                              :class="{
                                  'bg-zatara-blue text-white shadow-lg shadow-zatara-blue/30': step >= i,
@@ -22,7 +21,6 @@
                              }">
                             <span x-text="i"></span>
                         </div>
-                        <!-- Line -->
                         <div class="w-8 sm:w-16 h-1 transition-all duration-500" x-show="i < 5"
                              :class="{
                                  'bg-zatara-blue': step > i,
@@ -33,6 +31,33 @@
                 </template>
             </div>
         </div>
+
+        @if($this->guestSession)
+            <div class="max-w-4xl mx-auto mb-6 bg-orange-100 text-orange-800 p-4 rounded-xl text-center font-bold"
+                 x-data="{ 
+                     expiresAt: new Date('{{ $this->guestSession->expires_at->toIso8601String() }}').getTime(),
+                     now: new Date().getTime(),
+                     distance: 0,
+                     minutes: 0,
+                     seconds: 0,
+                     startTimer() {
+                         setInterval(() => {
+                             this.now = new Date().getTime();
+                             this.distance = this.expiresAt - this.now;
+                             if (this.distance < 0) {
+                                 window.location.href = '{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripInstance' => $tripInstance->id]) }}?expired=1';
+                             } else {
+                                 this.minutes = Math.floor((this.distance % (1000 * 60 * 60)) / (1000 * 60));
+                                 this.seconds = Math.floor((this.distance % (1000 * 60)) / 1000);
+                             }
+                         }, 1000);
+                     }
+                 }"
+                 x-init="startTimer()">
+                ⏱ مقاعدك محجوزة مؤقتاً لمدة: 
+                <span x-text="minutes"></span>:<span x-text="seconds < 10 ? '0' + seconds : seconds"></span>
+            </div>
+        @endif
 
         <!-- Form Wrapper (Glassmorphism) -->
         <div class="glass-panel rounded-[2.5rem] relative min-h-[400px] p-8 sm:p-12 overflow-hidden border-t border-white/60">
@@ -46,16 +71,30 @@
                 <p class="text-zatara-blue font-bold animate-pulse text-lg">جاري المعالجة...</p>
             </div>
 
-            <!-- STEP 1: Phone (Auth) -->
+            <!-- STEP 1: Lead Capture -->
             <div x-show="step === 1" x-transition.opacity.duration.300ms class="space-y-8">
                 <div class="text-center mb-10">
                     <h2 class="text-3xl font-bold text-zatara-blue">مرحباً بك في زتارة</h2>
-                    <p class="text-slate-500 text-base mt-2">يرجى إدخال رقم هاتفك للبدء بإجراءات الحجز</p>
+                    <p class="text-slate-500 text-base mt-2">يرجى إدخال بياناتك الأساسية للبدء بإجراءات الحجز</p>
                 </div>
 
-                <form wire:submit.prevent="submitPhone" class="max-w-md mx-auto space-y-8">
+                <form wire:submit.prevent="submitLeadCapture" class="max-w-md mx-auto space-y-6">
                     <div>
-                        <label for="phone" class="block text-sm font-bold text-zatara-blue mb-2">رقم الجوال</label>
+                        <label for="first_name" class="block text-sm font-bold text-zatara-blue mb-2">الاسم الأول</label>
+                        <input type="text" id="first_name" wire:model="form.passengers.0.first_name" placeholder="محمد"
+                               class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
+                        @error('form.passengers.0.first_name') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label for="email" class="block text-sm font-bold text-zatara-blue mb-2">البريد الإلكتروني</label>
+                        <input type="email" id="email" wire:model="form.email" dir="ltr" placeholder="example@gmail.com"
+                               class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
+                        @error('form.email') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
+                    </div>
+
+                    <div>
+                        <label for="phone" class="block text-sm font-bold text-zatara-blue mb-2">رقم الجوال <span class="text-slate-400 font-normal">(اختياري للواتساب)</span></label>
                         <input type="text" id="phone" wire:model="form.phone" dir="ltr" placeholder="+966500000000"
                                class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
                         @error('form.phone') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
@@ -211,6 +250,20 @@
                                     </select>
                                     @error("form.passengers.{$index}.trip_passenger_category_id") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
+                                
+                                @if($this->availablePickupPoints->count() > 0)
+                                    <div>
+                                        <label class="block text-xs font-bold text-zatara-blue mb-2">نقطة التجمع <span class="text-slate-400 font-normal">(اختياري)</span></label>
+                                        <select wire:model="form.passengers.{{ $index }}.pickup_point_id"
+                                                class="glass-input w-full px-4 py-3 text-slate-800 bg-white transition-colors {{ $errors->has("form.passengers.{$index}.pickup_point_id") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
+                                            <option value="">لا يوجد/تجمع ذاتي</option>
+                                            @foreach($this->availablePickupPoints as $point)
+                                                <option value="{{ $point->id }}">{{ $point->name }} - {{ \Carbon\Carbon::parse($point->pickup_time)->format('h:i A') }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error("form.passengers.{$index}.pickup_point_id") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @endforeach
@@ -288,6 +341,41 @@
 
                 <form wire:submit.prevent="submitBooking" class="space-y-8">
                     
+                    <!-- Payment Type Selection (Full vs Deposit) -->
+                    @if($tripInstance->tripTemplate->deposit_enabled)
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-zatara-blue mb-4">خطة الدفع</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <label class="relative flex items-center p-4 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-zatara-blue hover:shadow-sm transition-all has-[:checked]:border-zatara-blue has-[:checked]:bg-zatara-blue/5">
+                                    <input type="radio" wire:model.live="paymentType" value="full" class="sr-only">
+                                    <div class="flex-1 flex justify-between items-center">
+                                        <div>
+                                            <span class="block font-bold text-zatara-blue">دفع كامل المبلغ</span>
+                                            <span class="block text-sm text-slate-500">دفع إجمالي قيمة الحجز الآن</span>
+                                        </div>
+                                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors border-slate-300" :class="{ 'border-zatara-blue': $wire.paymentType === 'full' }">
+                                            <div class="w-2.5 h-2.5 rounded-full bg-zatara-blue opacity-0 transition-opacity" :class="{ 'opacity-100': $wire.paymentType === 'full' }"></div>
+                                        </div>
+                                    </div>
+                                </label>
+                                
+                                <label class="relative flex items-center p-4 bg-white border border-slate-200 rounded-2xl cursor-pointer hover:border-zatara-blue hover:shadow-sm transition-all has-[:checked]:border-zatara-blue has-[:checked]:bg-zatara-blue/5">
+                                    <input type="radio" wire:model.live="paymentType" value="deposit" class="sr-only">
+                                    <div class="flex-1 flex justify-between items-center">
+                                        <div>
+                                            <span class="block font-bold text-zatara-blue">دفع عربون ({{ $tripInstance->tripTemplate->deposit_percentage ?? 100 }}%)</span>
+                                            <span class="block text-sm text-slate-500">ادفع عربون لتأكيد حجزك وادفع الباقي لاحقاً</span>
+                                        </div>
+                                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors border-slate-300" :class="{ 'border-zatara-blue': $wire.paymentType === 'deposit' }">
+                                            <div class="w-2.5 h-2.5 rounded-full bg-zatara-blue opacity-0 transition-opacity" :class="{ 'opacity-100': $wire.paymentType === 'deposit' }"></div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    @endif
+                    
+                    <h3 class="text-lg font-bold text-zatara-blue mb-4">وسيلة الدفع</h3>
                     <!-- Payment Methods Radio Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         

@@ -31,8 +31,12 @@ class BookingSuccess extends Component
         return response()->streamDownload(function () use ($booking) {
             echo pdf()
                 ->withBrowsershot(function (Browsershot $browsershot) {
-                    $browsershot->setNodeBinary('/Users/ahmadzayed/.nvm/versions/node/v22.18.0/bin/node');
-                    $browsershot->setNpmBinary('/Users/ahmadzayed/.nvm/versions/node/v22.18.0/bin/npm');
+                    if (config('services.browsershot.node_path')) {
+                        $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+                    }
+                    if (config('services.browsershot.npm_path')) {
+                        $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+                    }
                 })
                 ->view('pdf.ticket', ['booking' => $booking, 'tripInstance' => $booking->tripInstance])
                 ->name('Zatara-Ticket-' . $booking->pnr . '.pdf')

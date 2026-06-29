@@ -16,8 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Exception;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
-use function Spatie\LaravelPdf\Support\pdf;
-use Spatie\Browsershot\Browsershot;
+
 
 #[Layout('components.layouts.storefront')]
 class CheckoutWizard extends Component
@@ -29,6 +28,7 @@ class CheckoutWizard extends Component
     
     public int $currentStep = 1;
     public $paymentMethod = 'cash';
+    public $paymentType = 'full';
     public $booking_id = null;
     public $wl_id = null; // Waiting List ID for conversion hook
 
@@ -40,11 +40,11 @@ class CheckoutWizard extends Component
             return;
         }
 
-        $this->tenant = $tenant;
-        $this->tripInstance = $tripInstance;
+        $this->tripInstance = $tripInstance->load('tripPassengerCategories', 'tripAddons', 'pickupRoutes.pickupPoints');
+        $this->tenant = $tripInstance->tenant;
         
         // Pass the trip instance ID to the form for strict validation scoping
-        $this->form->setTripInstanceId($tripInstance->id);
+        $this->form->setTripInstanceId($this->tripInstance->id);
         
         // Add one default passenger row
         $this->form->addPassenger();
@@ -52,7 +52,7 @@ class CheckoutWizard extends Component
         // Capture Waiting List Hook
         $this->wl_id = request()->query('wl');
 
-        if (Auth::guard('customer')->check()) {
+        if (Auth::guard('customer')->check() || session()->has('guest_session_id')) {
             $this->currentStep = 3;
         }
     }
@@ -64,6 +64,26 @@ class CheckoutWizard extends Component
             return;
         }
         $this->form->addPassenger();
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function getAvailablePickupPointsProperty()
+    {
+        $points = collect();
+        if ($this->tripInstance->relationLoaded('pickupRoutes')) {
+            foreach ($this->tripInstance->pickupRoutes as $route) {
+                $points = $points->merge($route->pickupPoints);
+            }
+        }
+        return $points;
+    }
+    #[Livewire\Attributes\Computed]
+    public function getGuestSessionProperty()
+    {
+        if (session()->has('guest_session_id')) {
+            return \App\Models\GuestSession::find(session()->get('guest_session_id'));
+        }
+        return null;
     }
 
     public function autoFillPassenger()
@@ -86,57 +106,44 @@ class CheckoutWizard extends Component
         $this->form->toggleAddon($addonId);
     }
 
-    public function submitPhone(CustomerOtpService $otpService)
+    public function submitLeadCapture()
     {
-        $this->form->validateOnly('phone');
-        
-        try {
-            $otpService->sendOtp($this->tenant, $this->form->phone);
-            $this->currentStep = 2; // Move to OTP verification
-        } catch (\Exception $e) {
-            $this->form->addError('phone', $e->getMessage());
-        }
-    }
+        $this->validate([
+            'form.passengers.0.first_name' => 'required|string|max:255',
+            'form.email' => 'required|email|max:255',
+            'form.phone' => 'nullable|string|max:20',
+        ]);
 
-    public function verifyOtp(CustomerOtpService $otpService)
-    {
-        \Illuminate\Support\Facades\Log::info("verifyOtp called with OTP: " . $this->form->otp);
-        $this->form->validateOnly('otp');
+        // Create Guest Session
+        $guestSession = \App\Models\GuestSession::create([
+            'first_name' => $this->form->passengers[0]['first_name'],
+            'email' => $this->form->email,
+            'phone' => $this->form->phone,
+            'trip_instance_id' => $this->tripInstance->id,
+            'expires_at' => now()->addMinutes(15),
+        ]);
 
-        try {
-            // [TESTING BYPASS] - Allow '000000' for local testing
-            if ($this->form->otp === '000000' && app()->environment('local', 'testing')) {
-                \Illuminate\Support\Facades\Log::info("Using OTP bypass");
-                $customer = \App\Models\Customer::firstOrCreate(
-                    ['phone' => $this->form->phone, 'tenant_id' => $this->tenant->id],
-                    ['name' => 'زائر تجريبي']
-                );
-            } else {
-                \Illuminate\Support\Facades\Log::info("Using real OTP verification");
-                // This service method must now handle logging in the customer upon success
-                $customer = $otpService->verifyOtp($this->tenant, $this->form->phone, $this->form->otp);
-            }
-            
-            \Illuminate\Support\Facades\Log::info("Logging in customer: " . $customer->id);
-            // Explicitly log the customer in using the customer guard
-            Auth::guard('customer')->login($customer);
-            
-            $this->currentStep = 3; // Move to Passenger details
-            \Illuminate\Support\Facades\Log::info("Step is now 3");
-            
-        } catch (OtpCoolDownException | InvalidOtpException $e) {
-            \Illuminate\Support\Facades\Log::error("OTP verification error: " . $e->getMessage());
-            $this->form->addError('otp', $e->getMessage());
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error("OTP unexpected error: " . $e->getMessage());
-            $this->form->addError('otp', 'An unexpected error occurred. Please try again.');
-        }
+        // Call InventoryLedger to create a hold
+        // The hold needs a quantity. Initially we might just hold 1 seat, or the number of passengers they currently have.
+        $seatsToHold = count($this->form->passengers);
+        $hold = \App\Models\InventoryLedger::create([
+            'trip_instance_id' => $this->tripInstance->id,
+            'quantity' => -$seatsToHold,
+            'type' => 'hold',
+            'expires_at' => now()->addMinutes(15),
+        ]);
+
+        $guestSession->update(['hold_id' => $hold->id]);
+
+        session()->put('guest_session_id', $guestSession->id);
+
+        $this->currentStep = 3; // Move to Passenger details
     }
 
     public function submitPassengers()
     {
-        // Must be logged in to proceed
-        if (!Auth::guard('customer')->check()) {
+        // Must be logged in or have a guest session
+        if (!Auth::guard('customer')->check() && !$this->guestSession) {
             $this->currentStep = 1;
             return;
         }
@@ -155,31 +162,67 @@ class CheckoutWizard extends Component
 
     public function submitBooking(CreateBookingService $bookingService)
     {
-        // 1. Strict Security: Must be logged in
-        if (!Auth::guard('customer')->check()) {
+        // 1. Strict Security: Must be logged in or Guest
+        if (!Auth::guard('customer')->check() && !$this->guestSession) {
             $this->currentStep = 1;
             return;
         }
 
-        $customer = Auth::guard('customer')->user();
+        $customerId = null;
 
-        // 2. Critical Cross-Tenant Check
-        if ($customer->tenant_id !== $this->tripInstance->tenant_id) {
-            throw new UnauthorizedException("Customer does not belong to this tenant.");
+        if (Auth::guard('customer')->check()) {
+            $customer = Auth::guard('customer')->user();
+            if ($customer->tenant_id !== $this->tripInstance->tenant_id) {
+                throw new UnauthorizedException("Customer does not belong to this tenant.");
+            }
+            $customerId = $customer->id;
         }
 
         // 3. Final Form Validation (Ensures tiers/addons belong to this trip)
         $this->form->validate();
 
         try {
+            // Calculate total amount to find deposit if applicable
+            $grandTotal = 0;
+            $overrideAmount = $this->tripInstance->price_override ? $this->tripInstance->price_override_amount : 0;
+            
+            $categoryIds = collect($this->form->passengers)->pluck('trip_passenger_category_id');
+            $addonIds    = collect($this->form->addons)->pluck('trip_addon_id');
+
+            $categories = \App\Models\TripPassengerCategory::whereIn('id', $categoryIds)->get()->keyBy('id');
+            $addons     = \App\Models\TripAddon::whereIn('id', $addonIds)->get()->keyBy('id');
+
+            foreach ($this->form->passengers as $p) {
+                $tier = $categories[$p['trip_passenger_category_id']] ?? null;
+                if ($tier) {
+                    $grandTotal += ($tier->price + $overrideAmount);
+                }
+            }
+            foreach ($this->form->addons as $a) {
+                $addon = $addons[$a['trip_addon_id']] ?? null;
+                if ($addon) {
+                    $grandTotal += ($addon->price * $a['quantity']);
+                }
+            }
+            
+            $depositAmount = null;
+            if ($this->paymentType === 'deposit' && $this->tripInstance->tripTemplate->deposit_enabled) {
+                $percentage = $this->tripInstance->tripTemplate->deposit_percentage ?? 100;
+                $depositAmount = ($grandTotal * $percentage) / 100;
+            }
+
             // Compile Unified Payload Array (DTO format)
             $payload = [
                 'tenant_id' => $this->tenant->id,
                 'trip_instance_id' => $this->tripInstance->id,
-                'customer_id' => Auth::guard('customer')->id(),
+                'customer_id' => $customerId, // Null if guest
+                'guest_session_id' => $this->guestSession ? $this->guestSession->id : null,
+                'hold_id' => $this->guestSession ? $this->guestSession->hold_id : null,
                 'user_id' => null, // Not an admin
                 'passengersData' => $this->form->passengers,
                 'addonsData' => $this->form->addons,
+                'payment_type' => $this->paymentType,
+                'deposit_amount' => $depositAmount,
                 'notes' => null,
             ];
 

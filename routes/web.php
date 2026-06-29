@@ -82,3 +82,28 @@ Route::middleware(['web', 'auth'])->get('/admin/secure-media/{media}', function 
 Route::get('/queue/redeem/{waitingList}', [\App\Http\Controllers\WaitingListController::class, 'redeem'])
     ->name('waiting-list.redeem')
     ->middleware('signed');
+
+Route::get('/admin/trip-instances/{tripInstance}/manifest', [\App\Http\Controllers\ManifestController::class, 'generate'])
+    ->name('trip-instance.manifest')
+    ->middleware(['web', 'auth']);
+
+// --- MAGIC LOGIN ROUTE ---
+Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
+    if (!$request->hasValidSignature()) {
+        abort(401, 'Invalid or expired magic link.');
+    }
+    
+    $tenantId = $request->query('tenant_id');
+    if (!$tenantId) {
+        abort(400, 'Tenant context missing from magic link.');
+    }
+
+    $customer = \App\Models\Customer::where('email', $request->query('email'))
+        ->where('tenant_id', $tenantId)
+        ->firstOrFail();
+        
+    \Illuminate\Support\Facades\Auth::guard('customer')->login($customer);
+    
+    // Redirect to customer dashboard or home
+    return redirect('/'); // Adjust this if there's a specific customer dashboard
+})->name('login.magic');

@@ -12,6 +12,7 @@ class BookingForm extends Form
     #[Locked]
     public $trip_instance_id;
     
+    public $email = '';
     public $phone = '';
     public $otp = '';
 
@@ -43,6 +44,11 @@ class BookingForm extends Form
                 Rule::exists('trip_passenger_categories', 'id')->where(function ($query) {
                     return $query->where('trip_instance_id', $this->trip_instance_id);
                 })
+            ],
+            'passengers.*.pickup_point_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('pickup_points', 'id')
             ],
             'passengers.*.extra_preferences' => ['nullable', 'array'],
 
@@ -82,6 +88,7 @@ class BookingForm extends Form
     {
         $this->passengers[] = [
             'trip_passenger_category_id' => null,
+            'pickup_point_id' => null,
             'dynamic_data' => []
         ];
     }

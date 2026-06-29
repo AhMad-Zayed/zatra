@@ -50,6 +50,16 @@ class TripInstance extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+    public function waitingLists(): HasMany
+    {
+        return $this->hasMany(WaitingList::class);
+    }
+
+    public function pickupRoutes()
+    {
+        return $this->belongsToMany(PickupRoute::class, 'trip_instance_pickup_routes');
+    }
+
     public function tripPassengerCategories(): HasMany
     {
         return $this->hasMany(TripPassengerCategory::class);
@@ -66,11 +76,21 @@ class TripInstance extends Model implements HasMedia
             return PHP_INT_MAX;
         }
 
-        $currentBooked = \App\Models\Passenger::whereHas('booking', function ($q) {
+        $available = \App\Models\InventoryLedger::where('trip_instance_id', $this->id)
+            ->where(function ($q) {
+                $q->whereNull('expires_at')
+                  ->orWhere('expires_at', '>', now());
+            })
+            ->sum('quantity');
+
+        return max(0, $available);
+    }
+
+    public function getPassengerWithAddons()
+    {
+        return \App\Models\Passenger::whereHas('booking', function ($q) {
             $q->where('trip_instance_id', $this->id)
               ->whereIn('booking_status', [\App\Enums\BookingStatus::Confirmed, \App\Enums\BookingStatus::Pending]);
-        })->count();
-
-        return max(0, $this->available_seats - $currentBooked);
+        })->with('bookingAddons.tripAddon')->get()->groupBy('id');
     }
 }

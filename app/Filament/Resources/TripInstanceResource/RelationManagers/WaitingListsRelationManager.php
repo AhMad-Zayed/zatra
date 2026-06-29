@@ -94,40 +94,59 @@ class WaitingListsRelationManager extends RelationManager
                     ->modalDescription('هل أنت متأكد من تجاوز الطابور وإرسال رابط الحجز لهذا العميل فوراً؟')
                     ->visible(fn ($record) => $record->status === WaitingListStatusEnum::Pending)
                     ->action(function ($record) {
-                        $signedUrl = URL::temporarySignedRoute(
-                            'waiting-list.redeem',
-                            now()->addHours(2),
-                            ['waitingList' => $record->id]
-                        );
-
-                        $record->update([
-                            'status' => WaitingListStatusEnum::Notified,
-                            'notified_at' => now(),
-                        ]);
-
-                        $channelPreference = $record->tenant->settings['waiting_list_channel'] ?? 'both';
-
-                        if (in_array($channelPreference, ['whatsapp', 'both'])) {
-                            if (class_exists(\App\Services\WhatsAppService::class)) {
-                                app(\App\Services\WhatsAppService::class)->sendWaitingListAlert(
-                                    $record->phone_number,
-                                    $record->customer_name,
-                                    $signedUrl
-                                );
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($record) {
+                            $instance = \App\Models\TripInstance::lockForUpdate()->find($record->trip_instance_id);
+                            if ($instance->getRemainingSeatsAttribute() < 1) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Cannot send link — trip is fully booked')
+                                    ->danger()
+                                    ->send();
+                                return;
                             }
-                        }
 
-                        if (in_array($channelPreference, ['email', 'both']) && $record->customer_email) {
-                            if (class_exists(\App\Mail\WaitingListAlertMail::class)) {
-                                \Illuminate\Support\Facades\Mail::to($record->customer_email)
-                                    ->send(new \App\Mail\WaitingListAlertMail($record, $signedUrl));
+                            // Create a 2-hour hold BEFORE sending the link
+                            \App\Models\InventoryLedger::create([
+                                'trip_instance_id' => $instance->id,
+                                'quantity'         => -1,
+                                'type'             => 'waitlist_hold',
+                                'expires_at'       => now()->addHours(2),
+                            ]);
+
+                            $signedUrl = URL::temporarySignedRoute(
+                                'waiting-list.redeem',
+                                now()->addHours(2),
+                                ['waitingList' => $record->id]
+                            );
+
+                            $record->update([
+                                'status' => WaitingListStatusEnum::Notified,
+                                'notified_at' => now(),
+                            ]);
+
+                            $channelPreference = $record->tenant->settings['waiting_list_channel'] ?? 'both';
+
+                            if (in_array($channelPreference, ['whatsapp', 'both'])) {
+                                if (class_exists(\App\Services\WhatsAppService::class)) {
+                                    app(\App\Services\WhatsAppService::class)->sendWaitingListAlert(
+                                        $record->phone_number,
+                                        $record->customer_name,
+                                        $signedUrl
+                                    );
+                                }
                             }
-                        }
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('تم إرسال الرابط للعميل بنجاح وتجاوز الطابور.')
-                            ->success()
-                            ->send();
+                            if (in_array($channelPreference, ['email', 'both']) && $record->customer_email) {
+                                if (class_exists(\App\Mail\WaitingListAlertMail::class)) {
+                                    \Illuminate\Support\Facades\Mail::to($record->customer_email)
+                                        ->send(new \App\Mail\WaitingListAlertMail($record, $signedUrl));
+                                }
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('تم إرسال الرابط للعميل بنجاح وتجاوز الطابور.')
+                                ->success()
+                                ->send();
+                        });
                     }),
 
                 Tables\Actions\Action::make('cancel_request')

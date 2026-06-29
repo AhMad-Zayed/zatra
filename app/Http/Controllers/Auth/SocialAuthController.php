@@ -33,6 +33,11 @@ class SocialAuthController extends Controller
                     ->where('email', $socialUser->getEmail())
                     ->first();
 
+        if ($customer && $customer->provider_id !== null && $customer->provider_id !== $socialUser->getId()) {
+            return redirect()->route('storefront.catalog', ['tenant' => $tenant->slug])
+                             ->with('error', 'Email already in use with a different provider.');
+        }
+
         if (!$customer) {
             $customer = Customer::create([
                 'tenant_id' => $tenant->id,
@@ -44,10 +49,12 @@ class SocialAuthController extends Controller
             ]);
         } else {
             // Link social provider to existing account if not linked
-            $customer->update([
-                'provider_id' => $socialUser->getId(),
-                'provider_name' => $provider,
-            ]);
+            if ($customer->provider_id === null) {
+                $customer->update([
+                    'provider_id' => $socialUser->getId(),
+                    'provider_name' => $provider,
+                ]);
+            }
         }
 
         Auth::guard('customer')->login($customer);

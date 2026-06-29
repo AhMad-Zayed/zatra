@@ -28,7 +28,7 @@ class Passenger extends Model implements HasMedia
     ];
 
     protected $casts = [
-        'price_at_booking' => 'decimal:2',
+        'price_at_booking' => \App\Casts\MoneyCast::class,
         'date_of_birth' => 'date',
         'extra_preferences' => 'array',
     ];

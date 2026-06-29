@@ -20,11 +20,16 @@ class TripTemplate extends Model implements HasMedia
         'description',
         'base_price',
         'passenger_requirements',
+        'requirement_preset_id',
+        'deposit_percentage',
+        'deposit_enabled',
     ];
 
     protected $casts = [
         'base_price' => \App\Casts\MoneyCast::class,
         'passenger_requirements' => 'array',
+        'deposit_enabled' => 'boolean',
+        'deposit_percentage' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -48,5 +53,10 @@ class TripTemplate extends Model implements HasMedia
     public function templateAddons(): HasMany
     {
         return $this->hasMany(TemplateAddon::class);
+    }
+
+    public function requirementPreset(): BelongsTo
+    {
+        return $this->belongsTo(RequirementPreset::class);
     }
 }

@@ -46,4 +46,9 @@ return [
         'private_key' => env('APPLE_PRIVATE_KEY'),
     ],
 
+    'browsershot' => [
+        'node_path' => env('BROWSERSHOT_NODE_PATH'),
+        'npm_path'  => env('BROWSERSHOT_NPM_PATH'),
+    ],
+
 ];

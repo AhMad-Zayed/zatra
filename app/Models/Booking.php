@@ -25,7 +25,8 @@ class Booking extends Model
         'payment_status',
         'grand_total',
         'total_paid',
-        'balance_due',
+        'deposit_amount',
+        'payment_type',
         'notes',
         'expires_at',
     ];
@@ -35,9 +36,14 @@ class Booking extends Model
         'payment_status' => PaymentStatus::class,
         'grand_total' => \App\Casts\MoneyCast::class,
         'total_paid' => \App\Casts\MoneyCast::class,
-        'balance_due' => \App\Casts\MoneyCast::class,
+        'deposit_amount' => \App\Casts\MoneyCast::class,
         'expires_at' => 'datetime',
     ];
+
+    public function getBalanceDueAttribute(): float|int
+    {
+        return $this->grand_total - ($this->total_paid ?? 0);
+    }
 
     protected static function booted(): void
     {
@@ -83,6 +89,11 @@ class Booking extends Model
     public function bookingAddons(): HasMany
     {
         return $this->hasMany(BookingAddon::class);
+    }
+
+    public function bookingPickups(): HasMany
+    {
+        return $this->hasMany(BookingPickup::class);
     }
 
     public function payments(): HasMany

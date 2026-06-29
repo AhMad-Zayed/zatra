@@ -18,4 +18,11 @@ class BookingObserver
             $booking->customer->notify(new BookingPending($booking));
         }
     }
+
+    public function updated(Booking $booking): void
+    {
+        if ($booking->wasChanged('booking_status') && $booking->booking_status === BookingStatus::Cancelled) {
+            \App\Jobs\WaitlistAutoPromotion::dispatch($booking->trip_instance_id);
+        }
+    }
 }

@@ -22,7 +22,7 @@ class TemplatePassengerCategory extends Model
     ];
 
     protected $casts = [
-        'price' => 'decimal:2',
+        'price' => \App\Casts\MoneyCast::class,
     ];
 
     protected static function booted(): void
