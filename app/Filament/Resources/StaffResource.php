@@ -18,7 +18,8 @@ class StaffResource extends Resource
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationGroup = 'الإدارة';
+    protected static ?string $navigationGroup = 'الإدارة والإعدادات';
+    protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'طاقم العمل';
     protected static ?string $modelLabel = 'موظف';
     protected static ?string $pluralModelLabel = 'طاقم العمل';
@@ -75,7 +76,8 @@ class StaffResource extends Resource
                             ->maxLength(255),
 
                         Forms\Components\CheckboxList::make('roles')
-                            ->label('الصلاحيات (Roles)')
+                            // LABEL-019: Pure Arabic label for roles field
+                            ->label('الصلاحيات والأدوار')
                             ->relationship('roles', 'name')
                             ->pivotData(fn () => ['tenant_id' => \Filament\Facades\Filament::getTenant()?->id])
                             ->options(function () {

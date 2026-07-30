@@ -39,7 +39,7 @@ class RevenueChart extends ChartWidget
         // Ensure all 12 months exist in the array (fill missing with 0)
         $data = [];
         for ($i = 1; $i <= 12; $i++) {
-            $data[] = isset($monthlyRevenues[$i]) ? ($monthlyRevenues[$i] / 100) : 0;
+            $data[] = isset($monthlyRevenues[$i]) ? (float) ($monthlyRevenues[$i] ?? 0) / 100 : 0.0;
         }
 
         return [
@@ -53,7 +53,8 @@ class RevenueChart extends ChartWidget
                     'tension' => 0.4,
                 ],
             ],
-            'labels' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            // LABEL-016: Arabic month names. CRIT-001: /100 is correct — DB stores integer cents.
+            'labels' => ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
         ];
     }
 

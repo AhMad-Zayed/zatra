@@ -23,6 +23,8 @@ class CheckoutWizard extends Component
 {
     public TripInstance $tripInstance;
     public Tenant $tenant;
+    public ?\App\Models\PackageOption $packageOption = null;
+    public ?int $selectedPackageId = null;
     
     public BookingForm $form;
     
@@ -51,14 +53,24 @@ class CheckoutWizard extends Component
 
         // Capture Waiting List Hook
         $this->wl_id = request()->query('wl');
+        
+        // Capture Package Option
+        $this->selectedPackageId = request('package');
+        if ($this->selectedPackageId) {
+            $this->packageOption = \App\Models\PackageOption::find($this->selectedPackageId);
+        }
 
         if (Auth::guard('customer')->check() || session()->has('guest_session_id')) {
-            $this->currentStep = 3;
+            $this->currentStep = 2;
         }
     }
 
     public function addPassenger()
     {
+        if (count($this->form->passengers) >= 10) {
+            $this->addError('form.passengers', "لا يمكن إضافة أكثر من 10 ركاب في حجز واحد.");
+            return;
+        }
         if (count($this->form->passengers) >= $this->tripInstance->remaining_seats) {
             $this->addError('form.passengers', "لا يمكنك إضافة ركاب إضافيين. المقاعد المتبقية: " . $this->tripInstance->remaining_seats);
             return;
@@ -110,8 +122,9 @@ class CheckoutWizard extends Component
     {
         $this->validate([
             'form.passengers.0.first_name' => 'required|string|max:255',
+            'form.passengers.0.last_name' => 'required|string|max:255',
             'form.email' => 'required|email|max:255',
-            'form.phone' => 'nullable|string|max:20',
+            'form.phone' => ['nullable', 'regex:/^\+?[0-9]{7,15}$/'],
         ]);
 
         // Create Guest Session
@@ -137,7 +150,7 @@ class CheckoutWizard extends Component
 
         session()->put('guest_session_id', $guestSession->id);
 
-        $this->currentStep = 3; // Move to Passenger details
+        $this->currentStep = 2; // Move to Passenger details
     }
 
     public function submitPassengers()
@@ -151,13 +164,13 @@ class CheckoutWizard extends Component
         $this->form->validateOnly('passengers');
         $this->form->validateOnly('passengers.*.trip_passenger_category_id');
 
-        $this->currentStep = 4; // Move to Addons (or final submit)
+        $this->currentStep = 3; // Move to Addons (or final submit)
     }
 
     public function submitAddons()
     {
         $this->form->validateOnly('addons');
-        $this->currentStep = 5; // Move to Payment Method
+        $this->currentStep = 4; // Move to Payment Method
     }
 
     public function submitBooking(CreateBookingService $bookingService)
@@ -166,6 +179,10 @@ class CheckoutWizard extends Component
         if (!Auth::guard('customer')->check() && !$this->guestSession) {
             $this->currentStep = 1;
             return;
+        }
+
+        if ($this->paymentMethod === 'stripe') {
+            abort(403, 'Stripe payments are currently disabled.');
         }
 
         $customerId = null;
@@ -205,6 +222,9 @@ class CheckoutWizard extends Component
                 }
             }
             
+            $packageAdj = $this->packageOption?->price_adjustment ?? 0;
+            $grandTotal += $packageAdj;
+            
             $depositAmount = null;
             if ($this->paymentType === 'deposit' && $this->tripInstance->tripTemplate->deposit_enabled) {
                 $percentage = $this->tripInstance->tripTemplate->deposit_percentage ?? 100;
@@ -219,6 +239,7 @@ class CheckoutWizard extends Component
                 'guest_session_id' => $this->guestSession ? $this->guestSession->id : null,
                 'hold_id' => $this->guestSession ? $this->guestSession->hold_id : null,
                 'user_id' => null, // Not an admin
+                'package_option_id' => $this->selectedPackageId,
                 'passengersData' => $this->form->passengers,
                 'addonsData' => $this->form->addons,
                 'payment_type' => $this->paymentType,
@@ -262,7 +283,7 @@ class CheckoutWizard extends Component
 
         } catch (InventoryExhaustedException $e) {
             $this->form->addError('passengers', $e->getMessage());
-            $this->currentStep = 3; // Send them back to passenger step
+            $this->currentStep = 2; // Send them back to passenger step
         } catch (\Exception $e) {
             // Catch-all to prevent 500 crashes
             $this->form->addError('passengers', 'Something went wrong while processing your booking. Please try again later.');

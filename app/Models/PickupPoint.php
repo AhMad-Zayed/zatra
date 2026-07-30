@@ -14,4 +14,9 @@ class PickupPoint extends Model
     {
         return $this->belongsTo(PickupRoute::class);
     }
+
+    public function tenant()
+    {
+        return $this->hasOneThrough(Tenant::class, PickupRoute::class, 'id', 'id', 'pickup_route_id', 'tenant_id');
+    }
 }

@@ -23,14 +23,18 @@ class StorefrontCatalog extends Component
 
     public function render()
     {
-        $tripInstances = TripInstance::where('tenant_id', $this->tenant->id)
-            ->where('status', 'active')
-            ->with(['tripTemplate', 'tripPassengerCategories'])
-            ->orderBy('start_date', 'asc')
+        $tripTemplates = \App\Models\TripTemplate::where('tenant_id', $this->tenant->id)
+            ->where('is_active', true)
+            ->whereHas('tripInstances', function ($query) {
+                $query->bookable();
+            })
+            ->with(['tripInstances' => function ($query) {
+                $query->bookable()->orderBy('start_date', 'asc');
+            }, 'media'])
             ->paginate(9);
 
         return view('livewire.storefront-catalog', [
-            'tripInstances' => $tripInstances,
+            'tripTemplates' => $tripTemplates,
             'tenant' => $this->tenant,
         ]);
     }

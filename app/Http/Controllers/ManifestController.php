@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\TripInstance;
 use App\Models\Passenger;
-use Barryvdh\DomPDF\Facade\Pdf;
+use Spatie\LaravelPdf\Facades\Pdf;
 
 class ManifestController extends Controller
 {
@@ -20,18 +20,18 @@ class ManifestController extends Controller
             $query->where('trip_instance_id', $tripInstance->id)
                   ->where('booking_status', '!=', 'cancelled');
         })
-        ->with(['booking', 'tripPassengerCategory', 'bookingPickups.pickupPoint.pickupRoute'])
+        ->with(['booking.bookingPickups.pickupPoint.pickupRoute', 'tripPassengerCategory', 'booking.customer'])
         ->get();
 
         // Map and sort passengers by pickup point
         $passengersList = $passengers->map(function ($passenger) {
-            $pickup = $passenger->bookingPickups->first();
+            $pickup = $passenger->booking?->bookingPickups->first();
             $pickupPoint = $pickup ? $pickup->pickupPoint : null;
             return [
                 'name' => $passenger->first_name . ' ' . $passenger->last_name,
-                'phone' => $passenger->booking->phone,
-                'pnr' => $passenger->booking->pnr,
-                'category' => $passenger->tripPassengerCategory->name,
+                'phone' => $passenger->booking?->customer?->phone ?? $passenger->booking?->user?->phone ?? 'N/A',
+                'pnr' => $passenger->booking?->pnr ?? 'N/A',
+                'category' => $passenger->tripPassengerCategory?->name ?? 'N/A',
                 'pickup_name' => $pickupPoint ? $pickupPoint->name : 'تجمع ذاتي',
                 'pickup_time' => $pickupPoint ? $pickupPoint->pickup_time : 'N/A',
                 'pickup_order' => $pickupPoint ? $pickupPoint->order : 9999,
@@ -41,12 +41,12 @@ class ManifestController extends Controller
         // Group by pickup point
         $groupedPassengers = $passengersList->groupBy('pickup_name');
 
-        $pdf = Pdf::loadView('pdf.manifest', [
+        return Pdf::view('pdf.manifest', [
             'tripInstance' => $tripInstance,
             'groupedPassengers' => $groupedPassengers,
             'totalPassengers' => $passengers->count()
-        ]);
-
-        return $pdf->stream('manifest-' . $tripInstance->id . '.pdf');
+        ])
+        ->format('A4')
+        ->name('manifest-' . $tripInstance->id . '.pdf');
     }
 }

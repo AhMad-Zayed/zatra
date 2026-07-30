@@ -41,16 +41,17 @@ class ProcessGatewayPaymentService
             ]);
 
             // 4. Calculate Financial Totals
-            $totalPaid = $booking->payments()->where('status', 'Completed')->sum('amount');
-            $balanceDue = max(0, $booking->grand_total - $totalPaid);
+            $totalPaidCents = $booking->payments()->where('status', 'Completed')->sum('amount');
+            $totalPaidFloat = $totalPaidCents / 100;
+            $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
 
             // 5. Update Booking Statuses
             $booking->update([
-                'total_paid' => $totalPaid,
-                'balance_due' => $balanceDue,
-                'payment_status' => $balanceDue <= 0 ? PaymentStatus::Paid : PaymentStatus::Partial,
+                'total_paid' => $totalPaidFloat,
+                'balance_due' => $balanceDueFloat,
+                'payment_status' => $balanceDueFloat <= 0 ? PaymentStatus::Paid : PaymentStatus::Partial,
                 // Transition booking status to Confirmed only if fully paid
-                'booking_status' => $balanceDue <= 0 ? \App\Enums\BookingStatus::Confirmed : $booking->booking_status,
+                'booking_status' => $balanceDueFloat <= 0 ? \App\Enums\BookingStatus::Confirmed : $booking->booking_status,
             ]);
 
             return $payment;

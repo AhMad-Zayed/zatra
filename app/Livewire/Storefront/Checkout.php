@@ -212,13 +212,15 @@ class Checkout extends Component
                 ];
 
                 if (isset($px['passport_photo'])) {
-                    // Pass the temporary file path from Livewire upload
-                    $item['passport'] = $px['passport_photo']->getRealPath();
+                    // Store the temporary file from Livewire upload to private disk and pass the absolute path
+                    $path = $px['passport_photo']->store('passports', 'private');
+                    $item['passport'] = storage_path('app/private/' . $path);
                 }
 
                 if (isset($px['national_id_photo'])) {
-                    // Pass the temporary file path from Livewire upload
-                    $item['national_id'] = $px['national_id_photo']->getRealPath();
+                    // Store the temporary file from Livewire upload to private disk and pass the absolute path
+                    $path = $px['national_id_photo']->store('national_ids', 'private');
+                    $item['national_id'] = storage_path('app/private/' . $path);
                 }
 
                 $passengersData[] = $item;

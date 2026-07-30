@@ -5,6 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BookingResource\Pages;
 use App\Filament\Resources\BookingResource\RelationManagers;
 use App\Models\Booking;
+use App\Models\TripInstance;
+use App\Models\TripPassengerCategory;
+use App\Models\TripAddon;
+use App\Models\PickupPoint;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -12,17 +16,33 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use pxlrbt\FilamentExcel\Actions\Tables\ExportBulkAction;
+use Illuminate\Support\Facades\DB;
 
 class BookingResource extends Resource
 {
     protected static ?string $model = Booking::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-ticket';
+    
+    protected static ?string $navigationGroup = 'العمليات اليومية';
+    protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'pnr';
 
     public static function getGloballySearchableAttributes(): array
     {
         return ['pnr', 'customer.phone', 'customer.name'];
+    }
+
+    // FIX N+1-001, N+1-002: Eager load customer and trip relationships to prevent N queries per table row
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with([
+                'customer',
+                'tripInstance.tripTemplate',
+                'passengers',
+            ]);
     }
 
     public static function getNavigationLabel(): string
@@ -55,7 +75,8 @@ class BookingResource extends Resource
                                         modifyQueryUsing: fn (Builder $query) => $query->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id)
                                     )
                                     ->getOptionLabelFromRecordUsing(fn (\Illuminate\Database\Eloquent\Model $record) => "{$record->name} - {$record->phone}")
-                                    ->label('العميل (Lead Customer)')
+                                    // LABEL-001: Removed English parenthetical
+                                    ->label('العميل الرئيسي')
                                     ->searchable()
                                     ->required()
                                     ->createOptionForm([
@@ -69,27 +90,73 @@ class BookingResource extends Resource
                                             ->tel()
                                             ->maxLength(255),
                                     ])
-                                    ->createOptionAction(fn (\Filament\Forms\Components\Actions\Action $action) => $action->mutateFormDataBeforeCreateUsing(function (array $data): array {
+                                    ->createOptionAction(fn (\Filament\Forms\Components\Actions\Action $action) => $action->mutateFormDataUsing(function (array $data): array {
                                         $data['tenant_id'] = \Filament\Facades\Filament::getTenant()?->id ?? auth()->user()->tenants()->first()->id;
                                         return $data;
                                     }))
                                     ->disabledOn('edit'),
                                 
                                 Forms\Components\Select::make('trip_instance_id')
-                                    ->label('موعد الرحلة (Trip Instance)')
+                                    // LABEL-002: Removed English parenthetical
+                                    ->label('موعد الرحلة')
                                     ->options(function () {
-                                        return \App\Models\TripInstance::with('tripTemplate')->get()->mapWithKeys(function ($instance) {
+                                        return TripInstance::with('tripTemplate')->get()->mapWithKeys(function ($instance) {
                                             return [$instance->id => $instance->tripTemplate->title . ' (' . $instance->start_date . ' الى ' . $instance->end_date . ')'];
                                         });
                                     })
                                     ->searchable()
                                     ->required()
                                     ->live()
+                                    // MISSING-INFO-001: Show remaining seats when selecting trip
+                                    ->hint(fn (?string $state): ?string =>
+                                        $state
+                                            ? (TripInstance::find($state)?->remaining_seats ?? '?') . ' مقعد متاح'
+                                            : null
+                                    )
+                                    ->hintColor(fn (?string $state): string =>
+                                        $state && (TripInstance::find($state)?->remaining_seats ?? 1) <= 5
+                                            ? 'danger' : 'success'
+                                    )
                                     ->afterStateUpdated(function (Forms\Set $set) {
                                         $set('passengers', []);
                                         $set('bookingAddons', []);
+                                        $set('package_option_id', null);
                                     })
                                     ->disabledOn('edit'),
+                                
+                                Forms\Components\Select::make('package_option_id')
+                                    ->label('باقة الإقامة')
+                                    ->options(fn (Forms\Get $get): array =>
+                                        \App\Models\PackageOption::where('trip_instance_id', $get('trip_instance_id'))
+                                            ->where('is_active', true)
+                                            ->orderBy('sort_order')
+                                            ->get()
+                                            ->mapWithKeys(fn ($p) => [
+                                                $p->id => $p->name 
+                                                    . ($p->hotel_name ? ' — ' . $p->hotel_name : '')
+                                                    . ($p->stars ? ' ' . str_repeat('★', $p->stars) : '')
+                                                    . ' (+$' . number_format($p->price_adjustment / 100, 2) . ')'
+                                            ])
+                                            ->toArray()
+                                    )
+                                    ->nullable()
+                                    ->placeholder('بدون إقامة / رحلة داخلية')
+                                    ->live()
+                                    ->hidden(fn (Forms\Get $get) => 
+                                        !$get('trip_instance_id') ||
+                                        \App\Models\PackageOption::where('trip_instance_id', $get('trip_instance_id'))
+                                                     ->where('is_active', true)
+                                                     ->count() === 0
+                                    )
+                                    ->hint(fn (Forms\Get $get): ?string =>
+                                        $get('package_option_id')
+                                            ? '$' . number_format(
+                                                \App\Models\PackageOption::find($get('package_option_id'))?->price_adjustment ?? 0, 
+                                                2
+                                              ) . ' إضافي على سعر الرحلة'
+                                            : null
+                                    )
+                                    ->hintColor('warning'),
                                 
                                 Forms\Components\Select::make('booking_status')
                                     ->label('حالة الحجز')
@@ -110,53 +177,97 @@ class BookingResource extends Resource
                                     ->visibleOn(['view', 'edit']),
 
                                 Forms\Components\DateTimePicker::make('expires_at')
-                                    ->label('تاريخ الانتهاء للدفع النقدي')
-                                    ->nullable()
+                                    // CRIT-007: Added default of +24h so new cash bookings don't expire immediately
+                                    ->label('موعد انتهاء مهلة الدفع')
+                                    ->default(now()->addHours(24))
+                                    ->helperText('سيتم إلغاء الحجز تلقائياً إذا لم يُسدَّد المبلغ قبل هذا الوقت')
+                                    ->required()
                                     ->native(false),
                             ])->columns(2),
 
-                        Forms\Components\Section::make('المسافرون (Passengers)')
+                        // LABEL-003: Pure Arabic section name
+                        Forms\Components\Section::make('بيانات المسافرين')
                             ->schema([
                                 Forms\Components\Repeater::make('passengers')
                                     ->relationship()
+                                    // VALID-001: Require at least one passenger
+                                    ->minItems(1)
+                                    ->helperText('يجب إضافة راكب واحد على الأقل لإتمام الحجز')
                                     ->schema([
+                                        // CRIT-003: Replaced non-existent dynamic_data with real Passenger model fields
+                                        Forms\Components\TextInput::make('first_name')
+                                            ->label('الاسم الأول')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Forms\Components\TextInput::make('last_name')
+                                            ->label('اسم العائلة')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Forms\Components\Select::make('document_type')
+                                            ->label('نوع الوثيقة')
+                                            ->options([
+                                                'national_id' => 'هوية وطنية',
+                                                'passport'    => 'جواز سفر',
+                                            ])
+                                            ->required(),
+                                        Forms\Components\TextInput::make('document_number')
+                                            ->label('رقم الوثيقة')
+                                            ->required()
+                                            ->maxLength(255),
+                                        Forms\Components\DatePicker::make('date_of_birth')
+                                            ->label('تاريخ الميلاد')
+                                            ->nullable(),
+                                        Forms\Components\Select::make('gender')
+                                            ->label('الجنس')
+                                            ->options(['male' => 'ذكر', 'female' => 'أنثى'])
+                                            ->nullable(),
                                         Forms\Components\Select::make('trip_passenger_category_id')
-                                            ->label('فئة التسعير')
+                                            ->label('فئة المسافر والسعر')
                                             ->options(function (Forms\Get $get) {
                                                 $instanceId = $get('../../trip_instance_id');
                                                 if (!$instanceId) return [];
-                                                return \App\Models\TripPassengerCategory::where('trip_instance_id', $instanceId)->pluck('name', 'id');
+                                                return TripPassengerCategory::where('trip_instance_id', $instanceId)->pluck('name', 'id');
                                             })
                                             ->required()
                                             ->live()
                                             ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
                                                 if ($state) {
-                                                    $tier = \App\Models\TripPassengerCategory::find($state);
+                                                    $tier = TripPassengerCategory::find($state);
                                                     if ($tier) {
-                                                        $set('unit_price', $tier->price);
+                                                        // Price is stored in cents, display in dollars
+                                                        $set('unit_price', round($tier->price / 100, 2));
                                                     }
                                                 }
                                             })
                                             ->disabledOn('edit'),
-                                        
+
+                                        // CRIT-004: Removed ->dehydrated(false) so unit_price participates in Livewire state
+                                        // and the grand total placeholder can correctly sum it
                                         Forms\Components\TextInput::make('unit_price')
                                             ->label('السعر')
                                             ->numeric()
                                             ->readOnly()
                                             ->prefix('$')
-                                            ->dehydrated(false),
-                                            
-                                        Forms\Components\KeyValue::make('dynamic_data')
-                                            ->label('معلومات إضافية')
-                                            ->disabledOn('edit')
-                                            ->columnSpanFull(),
+                                            ->live(),
+
+                                        Forms\Components\Select::make('pickup_point_id')
+                                            ->label('نقطة التجمع')
+                                            ->options(function (Forms\Get $get) {
+                                                $instanceId = $get('../../trip_instance_id');
+                                                if (!$instanceId) return [];
+                                                return PickupPoint::whereHas('pickupRoute.tripInstances', fn ($q) =>
+                                                    $q->where('trip_instances.id', $instanceId)
+                                                )->pluck('name', 'id');
+                                            })
+                                            ->nullable(),
                                     ])
-                                    ->columns(2)
+                                    ->columns(3)
                                     ->live()
                                     ->disabledOn('edit'),
                             ]),
 
-                        Forms\Components\Section::make('الإضافات (Addons)')
+                        // LABEL-004: Pure Arabic section name
+                        Forms\Components\Section::make('الخدمات الإضافية')
                             ->schema([
                                 Forms\Components\Repeater::make('bookingAddons')
                                     ->relationship()
@@ -168,7 +279,8 @@ class BookingResource extends Resource
                                                 $passengers = $get('../../passengers') ?? [];
                                                 $options = [];
                                                 foreach ($passengers as $key => $p) {
-                                                    $name = ($p['dynamic_data']['first_name'] ?? 'مسافر') . ' ' . ($p['dynamic_data']['last_name'] ?? '');
+                                                    // CRIT-003: Updated to use new first_name/last_name fields instead of dynamic_data
+                                                    $name = ($p['first_name'] ?? 'مسافر') . ' ' . ($p['last_name'] ?? '');
                                                     $options[$key] = $name; // Filament repeater keys are UUIDs, not DB IDs unless saved
                                                 }
                                                 // Actually, it's safer to query the DB if editing, or rely on the relationship if available.
@@ -245,25 +357,32 @@ class BookingResource extends Resource
                     ->schema([
                         Forms\Components\Section::make('ملخص الحساب')
                             ->schema([
+                                // CRIT-004: Grand total now works because unit_price is no longer dehydrated(false)
+                                // unit_price is set in dollars (already /100 from cents) so we sum directly
                                 Forms\Components\Placeholder::make('grand_total_placeholder')
                                     ->label('الإجمالي الكلي')
-                                    ->content(function (Forms\Get $get) {
-                                        $total = 0;
-                                        
+                                    ->live()
+                                    ->content(function (Forms\Get $get): string {
+                                        $total = 0.0;
+
                                         $passengers = $get('passengers');
                                         if (is_array($passengers)) {
                                             foreach ($passengers as $p) {
                                                 $total += (float) ($p['unit_price'] ?? 0);
                                             }
                                         }
-                                        
+
                                         $addons = $get('bookingAddons');
                                         if (is_array($addons)) {
                                             foreach ($addons as $a) {
+                                                // addon total_price is also stored in dollars in the UI
                                                 $total += (float) ($a['total_price'] ?? 0);
                                             }
                                         }
-                                        
+
+                                        $packageAdj = \App\Models\PackageOption::find($get('package_option_id'))?->price_adjustment ?? 0;
+                                        $total += $packageAdj;
+
                                         return '$' . number_format($total, 2);
                                     }),
                                     
@@ -321,29 +440,57 @@ class BookingResource extends Resource
                 Tables\Columns\TextColumn::make('tripInstance.tripTemplate.title')
                     ->label('الرحلة')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('payment_status')
+                    ->label('حالة الدفع')
+                    ->badge()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاريخ الحجز')
                     ->dateTime()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('passengers_count')
+                    ->label('المسافرين')
+                    ->counts('passengers')
+                    ->badge()
+                    ->color('info')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('grand_total')
                     ->label('الإجمالي')
                     ->money('USD')
                     ->sortable(),
+                // CRIT-002: balance_due IS a real DB column (integer cents) after migration
+                // MoneyCast handles /100 on read, so ->money('USD') works correctly.
+                // The color function receives cents (raw DB integer via ->sum), but column
+                // state goes through MoneyCast, so $state is in dollars. Compare with 0.
                 Tables\Columns\TextColumn::make('balance_due')
                     ->label('المتبقي')
                     ->money('USD')
-                    ->color(fn ($state) => $state == 0 ? 'success' : 'danger')
+                    ->color(fn ($state) => $state <= 0 ? 'success' : 'danger')
                     ->sortable(),
+                // MEDIUM-001: Passenger count in table
+                Tables\Columns\TextColumn::make('passengers_count')
+                    ->label('المسافرون')
+                    ->counts('passengers')
+                    ->badge()
+                    ->color('gray'),
                 Tables\Columns\TextColumn::make('booking_status')
                     ->label('حالة الحجز')
                     ->badge(),
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('حالة الدفع')
                     ->badge(),
+                // MEDIUM-002: Show which staff created this booking
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('أنشأه')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('booking_status')
+                    ->label('حالة الحجز')
+                    ->options(\App\Enums\BookingStatus::class),
                 Tables\Filters\SelectFilter::make('trip_instance_id')
-                    ->label('الرحلة (Trip Instance)')
+                    ->label('الرحلة')
                     ->options(fn () => \App\Models\TripInstance::with('tripTemplate')->get()->mapWithKeys(fn ($i) => [$i->id => $i->tripTemplate->title . ' (' . $i->start_date->format('Y-m-d') . ')']))
                     ->searchable(),
                 Tables\Filters\Filter::make('created_at')
@@ -362,11 +509,75 @@ class BookingResource extends Resource
                                 fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date),
                             );
                     }),
+                Tables\Filters\SelectFilter::make('booking_status')
+                    ->label('حالة الحجز')
+                    ->options(\App\Enums\BookingStatus::class),
                 Tables\Filters\SelectFilter::make('payment_status')
                     ->label('حالة الدفع')
                     ->options(\App\Enums\PaymentStatus::class),
             ])
             ->actions([
+                Tables\Actions\Action::make('send_whatsapp_ticket')
+                    ->label('إرسال التذكرة واتساب')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn (Booking $record) => in_array($record->booking_status, [\App\Enums\BookingStatus::Confirmed, \App\Enums\BookingStatus::ConfirmedPartial]))
+                    ->action(function (Booking $record) {
+                        $message = "مرحباً، مرفق تذكرة الحجز الخاصة بك برقم {$record->pnr}. نتمنى لك رحلة سعيدة!";
+                        \App\Jobs\SendBookingNotificationJob::dispatch($record, 'whatsapp', $message);
+                        \Filament\Notifications\Notification::make()->title('تم إرسال التذكرة بنجاح')->success()->send();
+                    }),
+                    
+                Tables\Actions\Action::make('confirm_deposit')
+                    ->label('تأكيد مع عربون')
+                    ->icon('heroicon-o-currency-dollar')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('تأكيد الحجز بدفع عربون')
+                    ->form([
+                        Forms\Components\TextInput::make('deposit_amount')
+                            ->label('قيمة العربون')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->maxValue(fn (Booking $record) => $record->grand_total),
+                    ])
+                    ->visible(fn (Booking $record) => $record->booking_status === \App\Enums\BookingStatus::Pending && $record->payment_status === \App\Enums\PaymentStatus::Unpaid)
+                    ->action(function (array $data, Booking $record) {
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($data, $record) {
+                            $deposit = $data['deposit_amount'];
+                            $record->update([
+                                'booking_status' => \App\Enums\BookingStatus::ConfirmedPartial,
+                                'payment_status' => \App\Enums\PaymentStatus::Partial,
+                                'total_paid' => $deposit,
+                                'balance_due' => $record->grand_total - $deposit,
+                                'payment_type' => 'deposit',
+                            ]);
+                            
+                            $record->payments()->create([
+                                'tenant_id' => $record->tenant_id,
+                                'amount' => $deposit,
+                                'payment_method' => 'cash',
+                                'status' => 'completed',
+                                'transaction_id' => 'DEP-' . time(),
+                                'type' => \App\Enums\PaymentType::DEPOSIT,
+                            ]);
+                        });
+                        \Filament\Notifications\Notification::make()->title('تم تأكيد العربون بنجاح')->success()->send();
+                    }),
+                    
+                Tables\Actions\Action::make('reopen_cancelled')
+                    ->label('إعادة فتح الحجز')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->visible(fn (Booking $record) => $record->booking_status === \App\Enums\BookingStatus::Cancelled && auth()->user()?->hasRole('agency_admin'))
+                    ->action(function (Booking $record) {
+                        $record->update(['booking_status' => \App\Enums\BookingStatus::Pending]);
+                        \Filament\Notifications\Notification::make()->title('تم إعادة فتح الحجز كمسودة')->success()->send();
+                    }),
+
                 Tables\Actions\Action::make('confirm_cash')
                     ->label('تأكيد الدفع النقدي')
                     ->icon('heroicon-o-banknotes')
@@ -374,7 +585,12 @@ class BookingResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('تأكيد استلام المبلغ النقدي')
                     ->modalDescription('هل أنت متأكد من استلام كامل المبلغ نقداً؟ سيتم تغيير حالة الحجز إلى مؤكد وإصدار التذكرة النهائية.')
-                    ->visible(fn (Booking $record) => $record->booking_status === \App\Enums\BookingStatus::Pending && $record->payment_status === \App\Enums\PaymentStatus::Unpaid)
+                    // SEC-004: Restrict cash confirmation to admin and accountant only
+                    ->visible(fn (Booking $record) =>
+                        $record->booking_status === \App\Enums\BookingStatus::Pending
+                        && $record->payment_status === \App\Enums\PaymentStatus::Unpaid
+                        && auth()->user()?->hasAnyRole(['agency_admin', 'accountant'])
+                    )
                     ->action(function (Booking $record) {
                         \Illuminate\Support\Facades\DB::transaction(function () use ($record) {
                             $record->update([
@@ -426,6 +642,7 @@ class BookingResource extends Resource
                                 'booking_status' => \App\Enums\BookingStatus::Confirmed,
                                 'payment_status' => \App\Enums\PaymentStatus::Paid,
                                 'total_paid' => $record->grand_total,
+                                'balance_due' => 0,
                             ]);
 
                             // Create payment ledger entry for the remaining balance
@@ -461,7 +678,12 @@ class BookingResource extends Resource
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('معالجة طلب الإلغاء واسترداد الأموال')
-                    ->visible(fn (Booking $record) => $record->cancellation_requested_at !== null && $record->booking_status !== \App\Enums\BookingStatus::Cancelled)
+                    // SEC-005: Restrict cancellation processing to admin and accountant only
+                    ->visible(fn (Booking $record) =>
+                        $record->cancellation_requested_at !== null
+                        && $record->booking_status !== \App\Enums\BookingStatus::Cancelled
+                        && auth()->user()?->hasAnyRole(['agency_admin', 'accountant'])
+                    )
                     ->form([
                         Forms\Components\TextInput::make('cancellation_fee')
                             ->label('رسوم الإلغاء (يتم خصمها من المدفوع)')
@@ -506,7 +728,13 @@ class BookingResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    // SEC-001: Restrict bulk delete to agency_admin only
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()?->hasRole('agency_admin')),
+                        
+                    ExportBulkAction::make()
+                        ->label('تصدير إلى Excel')
+                        ->visible(fn () => auth()->user()?->hasAnyRole(['agency_admin', 'accountant'])),
                 ]),
             ]);
     }
@@ -514,6 +742,7 @@ class BookingResource extends Resource
     public static function getRelations(): array
     {
         return [
+            RelationManagers\PassengersRelationManager::class,
             RelationManagers\PaymentsRelationManager::class,
         ];
     }

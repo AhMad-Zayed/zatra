@@ -72,17 +72,17 @@ class BookingService
                 // 5. Upload passenger documents via Spatie MediaLibrary
                 if (isset($px['passport'])) {
                     if (is_string($px['passport'])) {
-                        $passenger->addMedia($px['passport'])->preservingOriginal()->toMediaCollection('passport');
+                        $passenger->addMedia($px['passport'])->preservingOriginal()->toMediaCollection('passport', 'private');
                     } else {
-                        $passenger->addMedia($px['passport'])->toMediaCollection('passport');
+                        $passenger->addMedia($px['passport'])->toMediaCollection('passport', 'private');
                     }
                 }
 
                 if (isset($px['national_id'])) {
                     if (is_string($px['national_id'])) {
-                        $passenger->addMedia($px['national_id'])->preservingOriginal()->toMediaCollection('national_id');
+                        $passenger->addMedia($px['national_id'])->preservingOriginal()->toMediaCollection('national_id', 'private');
                     } else {
-                        $passenger->addMedia($px['national_id'])->toMediaCollection('national_id');
+                        $passenger->addMedia($px['national_id'])->toMediaCollection('national_id', 'private');
                     }
                 }
             }
@@ -137,20 +137,28 @@ class BookingService
             return;
         }
 
-        $paid = (float) $booking->payments()->sum('amount');
-        $total = (float) $booking->grand_total;
+        $paidCents = (int) $booking->payments()
+            ->where('type', '!=', \App\Enums\PaymentType::Reversal)
+            ->where('type', '!=', \App\Enums\PaymentType::Refund)
+            ->sum('amount');
+        
+        $totalCents = (int) round(($booking->grand_total ?? 0) * 100);
 
         // Derive status
         $newStatus = match (true) {
-            $paid <= 0 => \App\Enums\PaymentStatus::Unpaid,
-            $paid >= $total => \App\Enums\PaymentStatus::Paid,
+            $paidCents <= 0 => \App\Enums\PaymentStatus::Unpaid,
+            $paidCents >= $totalCents => \App\Enums\PaymentStatus::Paid,
             default => \App\Enums\PaymentStatus::PartiallyPaid,
         };
 
         if ($booking->payment_status !== $newStatus) {
             DB::table('bookings')
                 ->where('id', $booking->id)
-                ->update(['payment_status' => $newStatus->value, 'total_paid' => $paid, 'balance_due' => max(0, $total - $paid)]);
+                ->update([
+                    'payment_status' => $newStatus->value, 
+                    'total_paid' => $paidCents, 
+                    'balance_due' => max(0, $totalCents - $paidCents)
+                ]);
 
             if ($newStatus === \App\Enums\PaymentStatus::Paid) {
                 // If it becomes fully paid, we might want to automatically confirm the booking

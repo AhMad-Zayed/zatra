@@ -14,11 +14,23 @@ class ActivityLogResource extends Resource
 {
     protected static ?string $model = Activity::class;
 
+    protected static bool $isScopedToTenant = false;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    
+    protected static ?string $navigationGroup = 'الإدارة والإعدادات';
+    protected static ?int $navigationSort = 4;
     
     protected static ?string $navigationLabel = 'سجلات التدقيق';
     
     protected static ?string $pluralLabel = 'سجلات التدقيق';
+
+    // CRIT-008: Restrict audit log access to admin and accountant only
+    // Previously had no role guard despite opting out of tenant scoping
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['agency_admin', 'accountant', 'super_admin']) ?? false;
+    }
 
     public static function form(Form $form): Form
     {
@@ -70,7 +82,7 @@ class ActivityLogResource extends Resource
                 Tables\Columns\TextColumn::make('subject_type')
                     ->label('السجل المعدل')
                     ->state(fn ($record) => $record->subject_type ? match($record->subject_type) {
-                        \App\Models\Booking::class => 'حجز رقم ' . ($record->subject?->reference ?? "#{$record->subject_id}"),
+                        \App\Models\Booking::class => 'حجز رقم ' . ($record->subject?->pnr ?? "#{$record->subject_id}"),
                         \App\Models\Payment::class => 'دفعة مالية بقيمة ' . ($record->subject?->amount ?? '') . "$ (#{$record->subject_id})",
                         \App\Models\TripInstance::class => 'رحلة مجدولة #' . $record->subject_id,
                         \App\Models\TripTemplate::class => 'قالب رحلة #' . $record->subject_id,

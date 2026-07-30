@@ -35,7 +35,13 @@ class CreateBooking extends CreateRecord
             foreach ($data['passengers'] as $p) {
                 $passengersData[] = [
                     'trip_passenger_category_id' => $p['trip_passenger_category_id'],
-                    'dynamic_data' => $p['dynamic_data'] ?? null,
+                    'first_name' => $p['first_name'] ?? null,
+                    'last_name' => $p['last_name'] ?? null,
+                    'document_type' => $p['document_type'] ?? null,
+                    'document_number' => $p['document_number'] ?? null,
+                    'date_of_birth' => $p['date_of_birth'] ?? null,
+                    'gender' => $p['gender'] ?? null,
+                    'pickup_point_id' => $p['pickup_point_id'] ?? null,
                 ];
             }
         }

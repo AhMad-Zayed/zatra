@@ -6,10 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Tenant extends Model
+class Tenant extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('logo')->singleFile();
+        $this->addMediaCollection('hero_image')->singleFile();
+    }
 
     protected $fillable = [
         'name',
@@ -88,5 +96,15 @@ class Tenant extends Model
     public function globalAddons(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(GlobalAddon::class);
+    }
+
+    public function pickupRoutes(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PickupRoute::class);
+    }
+
+    public function requirementPresets(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(RequirementPreset::class);
     }
 }

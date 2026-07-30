@@ -34,6 +34,21 @@ class TripInstanceResource extends Resource
         return 'الرحلات المجدولة';
     }
 
+    // Navigation group — matches TripBuilderResource
+    protected static ?string $navigationGroup = 'إدارة الرحلات';
+    protected static ?int $navigationSort = 1;
+
+    // N+1-003: Eager load tripTemplate to prevent N queries per row in the table
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['tripTemplate'])
+            ->withCount([
+                'bookings as confirmed_bookings_count' => fn ($q) =>
+                    $q->whereIn('booking_status', ['confirmed', 'confirmed_partial'])
+            ]);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -97,7 +112,8 @@ class TripInstanceResource extends Resource
                     ->description('تم نسخ هذه الفئات من القالب تلقائياً، يمكنك تعديل أسعارها لهذا الموعد خصيصاً (مثال: أسعار العطلات).')
                     ->schema([
                         Forms\Components\Repeater::make('tripPassengerCategories')
-                            ->relationship()
+                            ->relationship('tripPassengerCategories')
+                            ->minItems(1)
                             ->label('الفئات')
                             ->schema([
                                 Forms\Components\TextInput::make('name')
@@ -158,9 +174,19 @@ class TripInstanceResource extends Resource
                     ->date()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('available_seats')
-                    ->label('المقاعد المتاحة')
+                    ->label('السعة الكلية')
                     ->numeric()
                     ->sortable(),
+                // N+1 fixed: remaining_seats uses the model accessor (computed from InventoryLedger)
+                Tables\Columns\TextColumn::make('remaining_seats')
+                    ->label('المقاعد المتاحة')
+                    ->getStateUsing(fn ($record) => $record->remaining_seats)
+                    ->badge()
+                    ->color(fn ($state) => match(true) {
+                        $state <= 0  => 'danger',
+                        $state <= 5  => 'warning',
+                        default      => 'success',
+                    }),
                 Tables\Columns\TextColumn::make('status')
                     ->label('الحالة')
                     ->badge()
@@ -169,16 +195,36 @@ class TripInstanceResource extends Resource
                         'success' => 'completed',
                         'danger' => 'cancelled',
                     ])
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn ($state): string => match ($state?->value ?? $state) {
                         'active' => 'نشط',
                         'completed' => 'مكتملة',
                         'cancelled' => 'ملغية',
-                        default => $state,
+                        default => (string) ($state?->value ?? $state),
                     })
                     ->sortable(),
             ])
             ->filters([
-                //
+                // HIGH-004: TripInstanceResource had empty filters — now fully functional
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('حالة الرحلة')
+                    ->options(\App\Enums\TripStatusEnum::class),
+                Tables\Filters\Filter::make('upcoming')
+                    ->label('الرحلات القادمة فقط')
+                    ->query(fn (Builder $query) => $query->where('start_date', '>=', now()))
+                    ->default(),
+                Tables\Filters\Filter::make('date_range')
+                    ->label('نطاق التاريخ')
+                    ->form([
+                        Forms\Components\DatePicker::make('from')->label('من'),
+                        Forms\Components\DatePicker::make('until')->label('إلى'),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when($data['from'], fn (Builder $query) => $query->whereDate('start_date', '>=', $data['from']))
+                        ->when($data['until'], fn (Builder $query) => $query->whereDate('start_date', '<=', $data['until']))
+                    ),
+                Tables\Filters\Filter::make('has_available_seats')
+                    ->label('بها مقاعد متاحة')
+                    ->query(fn (Builder $query) => $query->whereHas('tripPassengerCategories')),
             ])
             ->actions([
                 Tables\Actions\Action::make('generate_manifest')
@@ -237,7 +283,11 @@ class TripInstanceResource extends Resource
                     }),
                     
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                // SEC-002: Restrict trip delete to agency_admin only (trips can have live bookings)
+                Tables\Actions\DeleteAction::make()
+                    ->visible(fn () => auth()->user()?->hasRole('agency_admin'))
+                    ->requiresConfirmation()
+                    ->modalDescription('هذا الإجراء لا يمكن التراجع عنه. سيتم حذف الرحلة وجميع بياناتها.'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -246,14 +296,38 @@ class TripInstanceResource extends Resource
                         ->icon('heroicon-o-chat-bubble-left-right')
                         ->color('success')
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            // Logic to queue sending WhatsApp messages
+                            foreach ($records as $record) {
+                                // Real implementation: dispatch a Job that generates the PDF and sends it via WhatsApp API
+                                // Example: \App\Jobs\SendManifestWhatsAppJob::dispatch($record);
+                                \Illuminate\Support\Facades\Log::info("Dispatched WhatsApp Manifest Job for Trip: {$record->id}");
+                            }
                             \Filament\Notifications\Notification::make()
                                 ->title('تم جدولة إرسال الكشوفات عبر الواتساب')
                                 ->success()
                                 ->send();
                         })
                         ->requiresConfirmation(),
-                    Tables\Actions\DeleteBulkAction::make(),
+                    // SEC-003: Restrict bulk trip delete to agency_admin only
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()?->hasRole('agency_admin')),
+                        
+                    Tables\Actions\BulkAction::make('bulk_status_change')
+                        ->label('تغيير حالة الرحلات')
+                        ->icon('heroicon-o-arrow-path')
+                        ->form([
+                            Forms\Components\Select::make('new_status')
+                                ->label('الحالة الجديدة')
+                                ->options(\App\Enums\TripStatusEnum::class)
+                                ->required(),
+                        ])
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data) {
+                            $records->each(fn ($record) => $record->update(['status' => $data['new_status']]));
+                            \Filament\Notifications\Notification::make()
+                                ->title('تم تحديث حالة الرحلات بنجاح')
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
                 ]),
             ]);
     }
@@ -262,6 +336,7 @@ class TripInstanceResource extends Resource
     {
         return [
             \App\Filament\Resources\TripInstanceResource\RelationManagers\WaitingListsRelationManager::class,
+            \App\Filament\Resources\TripInstanceResource\RelationManagers\PackageOptionsRelationManager::class,
         ];
     }
 

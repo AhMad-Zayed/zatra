@@ -18,7 +18,8 @@ use Illuminate\Support\Facades\Log;
 class ManageAgencySettings extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
-    protected static ?string $navigationGroup = 'الإعدادات';
+    protected static ?string $navigationGroup = 'الإدارة والإعدادات';
+    protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'إعدادات الوكالة';
     protected static ?string $title = 'إعدادات الوكالة';
     protected static string $view = 'filament.pages.manage-agency-settings';

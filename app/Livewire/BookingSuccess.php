@@ -9,12 +9,14 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use function Spatie\LaravelPdf\Support\pdf;
 use Spatie\Browsershot\Browsershot;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 #[Layout('components.layouts.storefront')]
 class BookingSuccess extends Component
 {
     public Booking $booking;
     public Tenant $tenant;
+    public string $qrCodeSvg;
 
     public function mount(Tenant $tenant, $uuid)
     {
@@ -22,6 +24,8 @@ class BookingSuccess extends Component
         $this->booking = Booking::where('uuid', $uuid)
             ->with(['passengers.tripPassengerCategory', 'tripInstance.tripTemplate', 'tenant', 'bookingAddons.tripAddon'])
             ->firstOrFail();
+            
+        $this->qrCodeSvg = QrCode::format('svg')->size(150)->generate($this->booking->pnr);
     }
 
     public function downloadPdf()
@@ -47,6 +51,7 @@ class BookingSuccess extends Component
 
     public function render()
     {
+        $this->booking->loadMissing(['passengers.tripPassengerCategory', 'tripInstance.tripTemplate']);
         return view('livewire.booking-success');
     }
 }

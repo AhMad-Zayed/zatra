@@ -18,11 +18,14 @@ class TripBuilderResource extends Resource
     protected static ?string $model = \App\Models\TripTemplate::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-sparkles';
-    protected static ?string $navigationGroup = 'Trips';
+    // CRIT-006: Fixed English navigation group to Arabic
+    protected static ?string $navigationGroup = 'الرحلات';
+    protected static ?int $navigationSort = 2;
 
     public static function getNavigationLabel(): string
     {
-        return 'منشئ الرحلات (Wizard)';
+        // LABEL-011: Removed English '(Wizard)' parenthetical
+        return 'منشئ الرحلات';
     }
 
     public static function getModelLabel(): string
@@ -65,7 +68,26 @@ class TripBuilderResource extends Resource
                                 ->options(\App\Models\PickupRoute::pluck('name', 'id'))
                                 ->searchable()
                                 ->preload()
-                                ->required(),
+                                ->required()
+                                ->createOptionForm([
+                                    Forms\Components\TextInput::make('name')
+                                        ->label('اسم المسار')
+                                        ->required()
+                                        ->maxLength(255),
+                                    Forms\Components\Toggle::make('is_active')
+                                        ->label('نشط')
+                                        ->default(true),
+                                    Forms\Components\Textarea::make('description')
+                                        ->label('الوصف')
+                                        ->columnSpanFull(),
+                                ])
+                                ->createOptionUsing(function (array $data) {
+                                    if (auth()->check()) {
+                                        $data['tenant_id'] = \Filament\Facades\Filament::getTenant()?->id;
+                                    }
+                                    return \App\Models\PickupRoute::create($data)->getKey();
+                                })
+                                ->createOptionAction(fn (\Filament\Forms\Components\Actions\Action $action) => $action->slideOver()),
                             Forms\Components\MarkdownEditor::make('description')
                                 ->label('الوصف'),
                             // Hidden field for passenger requirements since it's populated by preset

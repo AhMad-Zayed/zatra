@@ -18,10 +18,13 @@ class Payment extends Model
         'amount',
         'payment_method',
         'reference_number',
+        'type',
+        'received_by',
     ];
 
     protected $casts = [
         'amount' => \App\Casts\MoneyCast::class,
+        'type' => \App\Enums\PaymentType::class,
     ];
 
     protected static function booted(): void
@@ -49,5 +52,10 @@ class Payment extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    public function receivedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by');
     }
 }

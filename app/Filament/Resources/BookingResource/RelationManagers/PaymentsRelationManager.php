@@ -74,19 +74,24 @@ class PaymentsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->after(function () {
                         $booking = $this->getOwnerRecord();
-                        $totalPaid = $booking->payments()->sum('amount');
-                        $balanceDue = $booking->grand_total - $totalPaid;
+                        $totalPaidCents = $booking->payments()
+                            ->where('type', '!=', \App\Enums\PaymentType::Reversal)
+                            ->where('type', '!=', \App\Enums\PaymentType::Refund)
+                            ->sum('amount');
+                        
+                        $totalPaidFloat = $totalPaidCents / 100;
+                        $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
                         
                         $paymentStatus = PaymentStatus::Unpaid;
-                        if ($totalPaid > 0 && $balanceDue > 0) {
+                        if ($totalPaidFloat > 0 && $balanceDueFloat > 0) {
                             $paymentStatus = PaymentStatus::PartiallyPaid;
-                        } elseif ($balanceDue <= 0) {
+                        } elseif ($balanceDueFloat <= 0) {
                             $paymentStatus = PaymentStatus::Paid;
                         }
                         
                         $booking->update([
-                            'total_paid' => $totalPaid,
-                            'balance_due' => $balanceDue,
+                            'total_paid' => $totalPaidFloat,
+                            'balance_due' => $balanceDueFloat,
                             'payment_status' => $paymentStatus,
                         ]);
                     })

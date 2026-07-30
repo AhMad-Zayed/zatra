@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\URL;
 class WaitingListsRelationManager extends RelationManager
 {
     protected static string $relationship = 'waitingLists';
-    protected static ?string $title = 'قائمة الانتظار (Waiting List)';
+    // LABEL-009: Pure Arabic title
+    protected static ?string $title = 'قائمة الانتظار';
 
     public function form(Form $form): Form
     {
@@ -98,7 +99,8 @@ class WaitingListsRelationManager extends RelationManager
                             $instance = \App\Models\TripInstance::lockForUpdate()->find($record->trip_instance_id);
                             if ($instance->getRemainingSeatsAttribute() < 1) {
                                 \Filament\Notifications\Notification::make()
-                                    ->title('Cannot send link — trip is fully booked')
+                                    // Fixed to Arabic
+                                    ->title('تعذّر إرسال الرابط — الرحلة مكتملة العدد')
                                     ->danger()
                                     ->send();
                                 return;

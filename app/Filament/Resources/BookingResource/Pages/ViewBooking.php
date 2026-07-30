@@ -22,30 +22,34 @@ class ViewBooking extends ViewRecord
             Actions\EditAction::make(),
             
             Actions\Action::make('record_payment')
-                ->label('تسجيل دفعة (Record Payment)')
+                // LABEL-005: Pure Arabic label
+                ->label('تسجيل دفعة مالية')
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
                 ->visible(fn ($record) => $record->balance_due > 0 && $record->booking_status !== BookingStatus::Cancelled)
                 ->form([
                     TextInput::make('amount')
-                        ->label('المبلغ (Amount)')
+                        // LABEL-006: Pure Arabic label
+                        ->label('المبلغ')
                         ->required()
                         ->numeric()
                         ->minValue(0.01)
                         ->maxValue(fn ($record) => $record->balance_due)
                         ->prefix('SAR'),
-                        
+
                     Select::make('payment_method')
-                        ->label('طريقة الدفع (Payment Method)')
+                        // LABEL-007: Pure Arabic label and options
+                        ->label('طريقة الدفع')
                         ->required()
                         ->options([
-                            'cash' => 'نقدي (Cash)',
-                            'bank_transfer' => 'حوالة بنكية (Bank Transfer)',
-                            'e_wallet' => 'محفظة إلكترونية (E-Wallet)',
+                            'cash'          => 'نقدي',
+                            'bank_transfer' => 'حوالة بنكية',
+                            'e_wallet'      => 'محفظة إلكترونية',
                         ]),
-                        
+
                     Textarea::make('reference_note')
-                        ->label('ملاحظات/رقم المرجع (Reference/Note)')
+                        // LABEL-008: Pure Arabic label
+                        ->label('الملاحظات ورقم المرجع')
                         ->nullable(),
                 ])
                 ->action(function (array $data, $record) {

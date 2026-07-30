@@ -17,7 +17,11 @@ class PickupPointResource extends Resource
 {
     protected static ?string $model = PickupPoint::class;
 
-    protected static ?string $navigationGroup = 'اللوجستيات (Logistics)';
+    protected static bool $isScopedToTenant = false;
+
+    // LABEL-017: Pure Arabic navigation group (removed 'Logistics' English parenthetical)
+    protected static ?string $navigationGroup = 'اللوجستيات';
+    protected static ?int $navigationSort = 2;
 
     public static function getNavigationLabel(): string
     {
@@ -61,13 +65,36 @@ class PickupPointResource extends Resource
     {
         return $table
             ->columns([
-                //
+                // HIGH-002: Table was completely blank — added all relevant columns
+                Tables\Columns\TextColumn::make('name')
+                    ->label('اسم النقطة')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
+                Tables\Columns\TextColumn::make('pickupRoute.name')
+                    ->label('المسار')
+                    ->sortable()
+                    ->badge()
+                    ->color('info'),
+                Tables\Columns\TextColumn::make('address')
+                    ->label('العنوان')
+                    ->limit(40)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('pickup_time')
+                    ->label('وقت التجمع')
+                    ->time('h:i A')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('order')
+                    ->label('الترتيب')
+                    ->sortable(),
             ])
+            ->defaultSort('order', 'asc')
             ->filters([
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('تعديل'),
+                Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -81,6 +108,13 @@ class PickupPointResource extends Resource
         return [
             //
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->whereHas('pickupRoute', function (Builder $query) {
+            $query->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id);
+        });
     }
 
     public static function getPages(): array

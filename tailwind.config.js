@@ -5,6 +5,12 @@ export default {
     "./resources/**/*.js",
     "./resources/**/*.vue",
   ],
+  safelist: [
+    'glass-panel',
+    'btn-primary',
+    'btn-secondary',
+    'glass-input'
+  ],
   theme: {
     extend: {
       colors: {

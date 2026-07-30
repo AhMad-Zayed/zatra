@@ -17,7 +17,9 @@ class PickupRouteResource extends Resource
 {
     protected static ?string $model = PickupRoute::class;
 
-    protected static ?string $navigationGroup = 'اللوجستيات (Logistics)';
+    // LABEL-018: Pure Arabic navigation group (removed 'Logistics' English parenthetical)
+    protected static ?string $navigationGroup = 'اللوجستيات';
+    protected static ?int $navigationSort = 1;
 
     public static function getNavigationLabel(): string
     {
@@ -55,13 +57,36 @@ class PickupRouteResource extends Resource
     {
         return $table
             ->columns([
-                //
+                // HIGH-003: Table was completely blank — added all relevant columns
+                Tables\Columns\TextColumn::make('name')
+                    ->label('اسم المسار')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
+                Tables\Columns\TextColumn::make('description')
+                    ->label('الوصف')
+                    ->limit(50)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('pickup_points_count')
+                    ->label('عدد النقاط')
+                    ->counts('pickupPoints')
+                    ->badge()
+                    ->color('primary'),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('نشط')
+                    ->boolean(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('تاريخ الإنشاء')
+                    ->date('d/m/Y')
+                    ->sortable(),
             ])
             ->filters([
-                //
+                Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('حالة المسار'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()->label('تعديل'),
+                Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

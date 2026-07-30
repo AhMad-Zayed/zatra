@@ -19,6 +19,9 @@ class PaymentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
 
+    protected static ?string $navigationGroup = 'العمليات اليومية';
+    protected static ?int $navigationSort = 2;
+
     public static function getNavigationLabel(): string
     {
         return 'المدفوعات';
@@ -39,7 +42,7 @@ class PaymentResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Select::make('booking_id')
-                    ->relationship('booking', 'reference')
+                    ->relationship('booking', 'pnr')
                     ->label('رقم مرجع الحجز')
                     ->required()
                     ->searchable()
@@ -83,13 +86,13 @@ class PaymentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('booking.reference')
+                Tables\Columns\TextColumn::make('booking.pnr')
                     ->label('رقم الحجز')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amount')
                     ->label('المبلغ')
-                    ->money('USD')
+                    ->money('SAR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_method')
                     ->label('طريقة الدفع')
@@ -129,7 +132,23 @@ class PaymentResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('payment_method')
+                    ->label('طريقة الدفع')
+                    ->options([
+                        'cash' => 'نقدي',
+                        'transfer' => 'تحويل بنكي',
+                        'visa' => 'بطاقة ائتمان / فيزا',
+                    ]),
+                Tables\Filters\Filter::make('created_at')
+                    ->label('تاريخ العملية')
+                    ->form([
+                        Forms\Components\DatePicker::make('from')->label('من تاريخ'),
+                        Forms\Components\DatePicker::make('until')->label('إلى تاريخ'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when($data['from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
+                        ->when($data['until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date))
+                    ),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

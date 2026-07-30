@@ -45,7 +45,8 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 \App\Filament\Widgets\DashboardStatsOverview::class,
-                \App\Filament\Widgets\BookingStatsWidget::class,
+                // BookingStatsWidget was merged into DashboardStatsOverview (CRIT-001 fix)
+                \App\Filament\Widgets\TodaysDeparturesWidget::class, // HIGH-006
             ])
             ->middleware([
                 EncryptCookies::class,

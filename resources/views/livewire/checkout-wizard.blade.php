@@ -7,28 +7,43 @@
                 تأكيد حجز رحلتك
             </h1>
             <p class="text-slate-500 text-lg">
-                {{ $tripInstance->tripTemplate->title }}
+                {{ $tripInstance->tripTemplate?->title }}
             </p>
 
             <!-- Stepper Progress -->
-            <div class="mt-10 flex justify-center items-center gap-2 max-w-2xl mx-auto" x-show="step < 6">
-                <template x-for="i in 5" :key="i">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-sm"
-                             :class="{
-                                 'bg-zatara-blue text-white shadow-lg shadow-zatara-blue/30': step >= i,
-                                 'bg-white text-slate-400 border border-slate-200': step < i
-                             }">
-                            <span x-text="i"></span>
-                        </div>
-                        <div class="w-8 sm:w-16 h-1 transition-all duration-500" x-show="i < 5"
-                             :class="{
-                                 'bg-zatara-blue': step > i,
-                                 'bg-slate-200': step <= i
-                             }">
+            <div class="mt-10 max-w-2xl mx-auto" x-show="step < 6">
+                <div class="block md:hidden w-full mb-8">
+                    <div class="flex justify-between text-xs text-slate-400 mb-2 font-bold">
+                        <span x-text="'الخطوة ' + step + ' من 4'"></span>
+                        <span x-text="Math.round((step/4)*100) + '%'"></span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2">
+                        <div class="bg-zatara-blue h-2 rounded-full transition-all duration-500"
+                             :style="'width: ' + (step/4*100) + '%'">
                         </div>
                     </div>
-                </template>
+                </div>
+
+                <!-- Desktop Step Circles -->
+                <div class="hidden md:flex justify-center items-center gap-2 rtl:flex-row-reverse">
+                    <template x-for="i in 4" :key="i">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 shadow-sm"
+                                 :class="{
+                                     'bg-zatara-blue text-white shadow-lg shadow-zatara-blue/30': step >= i,
+                                     'bg-white text-slate-400 border border-slate-200': step < i
+                                 }">
+                                <span x-text="i"></span>
+                            </div>
+                            <div class="w-8 sm:w-16 h-1 transition-all duration-500" x-show="i < 4"
+                                 :class="{
+                                     'bg-zatara-blue': step > i,
+                                     'bg-slate-200': step <= i
+                                 }">
+                            </div>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -63,7 +78,7 @@
         <div class="glass-panel rounded-[2.5rem] relative min-h-[400px] p-8 sm:p-12 overflow-hidden border-t border-white/60">
             
             <!-- Global Loading Indicator -->
-            <div wire:loading class="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+            <div wire:loading wire:target="submitLeadCapture, verifyOtp, submitPassengers, submitAddons, submitBooking" class="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
                 <svg class="animate-spin h-12 w-12 text-zatara-blue mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -79,23 +94,31 @@
                 </div>
 
                 <form wire:submit.prevent="submitLeadCapture" class="max-w-md mx-auto space-y-6">
-                    <div>
-                        <label for="first_name" class="block text-sm font-bold text-zatara-blue mb-2">الاسم الأول</label>
-                        <input type="text" id="first_name" wire:model="form.passengers.0.first_name" placeholder="محمد"
-                               class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
-                        @error('form.passengers.0.first_name') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="first_name" class="block text-sm font-bold text-zatara-blue mb-2">الاسم الأول</label>
+                            <input type="text" id="first_name" wire:model.blur="form.passengers.0.first_name" placeholder="محمد"
+                                   class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
+                            @error('form.passengers.0.first_name') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
+                        </div>
+                        <div>
+                            <label for="last_name" class="block text-sm font-bold text-zatara-blue mb-2">العائلة</label>
+                            <input type="text" id="last_name" wire:model.blur="form.passengers.0.last_name" placeholder="الزهراني"
+                                   class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
+                            @error('form.passengers.0.last_name') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
+                        </div>
                     </div>
 
                     <div>
                         <label for="email" class="block text-sm font-bold text-zatara-blue mb-2">البريد الإلكتروني</label>
-                        <input type="email" id="email" wire:model="form.email" dir="ltr" placeholder="example@gmail.com"
+                        <input type="email" id="email" wire:model.blur="form.email" dir="ltr" placeholder="example@gmail.com"
                                class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
                         @error('form.email') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
                     </div>
 
                     <div>
                         <label for="phone" class="block text-sm font-bold text-zatara-blue mb-2">رقم الجوال <span class="text-slate-400 font-normal">(اختياري للواتساب)</span></label>
-                        <input type="text" id="phone" wire:model="form.phone" dir="ltr" placeholder="+966500000000"
+                        <input type="text" id="phone" wire:model.blur="form.phone" dir="ltr" placeholder="+966500000000"
                                class="glass-input w-full px-4 py-4 text-slate-800 text-lg">
                         @error('form.phone') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
                     </div>
@@ -106,47 +129,8 @@
                 </form>
             </div>
 
-            <!-- STEP 2: OTP -->
+            <!-- STEP 2: Passengers -->
             <div x-show="step === 2" 
-                 x-transition:enter="transition ease-out duration-500"
-                 x-transition:enter-start="opacity-0 translate-y-4"
-                 x-transition:enter-end="opacity-100 translate-y-0"
-                 style="display: none;" class="space-y-8">
-                <div class="text-center mb-10">
-                    <div class="w-16 h-16 bg-zatara-blue/5 text-zatara-blue rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span class="material-symbols-outlined text-[32px]">sms</span>
-                    </div>
-                    <h2 class="text-3xl font-bold text-zatara-blue">رمز التحقق</h2>
-                    <p class="text-slate-500 text-base mt-2">لقد أرسلنا رمزاً مكوناً من 6 أرقام إلى هاتفك</p>
-                </div>
-
-                <form wire:submit.prevent="verifyOtp" class="max-w-md mx-auto space-y-8">
-                    <div>
-                        <input type="text" id="otp" wire:model="form.otp" maxlength="6" dir="ltr" placeholder="123456"
-                               class="glass-input w-full text-center tracking-[0.5em] text-3xl font-bold text-zatara-blue py-4 transition-all duration-300 focus:ring-2 {{ $errors->has('form.otp') ? 'border-zatara-red focus:ring-zatara-red/20' : 'focus:ring-zatara-blue/20' }}">
-                        @error('form.otp') <span class="text-zatara-red text-xs mt-2 block text-center font-medium">{{ $message }}</span> @enderror
-                    </div>
-
-                    <div class="flex gap-4">
-                        <button type="button" wire:click="$set('currentStep', 1)" class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 rounded-2xl transition-all">
-                            تراجع
-                        </button>
-                        <button type="submit" class="btn-primary w-2/3 shadow-lg shadow-zatara-blue/20 relative disabled:opacity-75" wire:loading.attr="disabled" wire:target="verifyOtp">
-                            <span wire:loading.remove wire:target="verifyOtp">تحقق</span>
-                            <span wire:loading wire:target="verifyOtp" class="flex items-center justify-center gap-2">
-                                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                جاري التحقق...
-                            </span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- STEP 3: Passengers -->
-            <div x-show="step === 3" 
                  x-transition:enter="transition ease-out duration-500 delay-100"
                  x-transition:enter-start="opacity-0 translate-y-4"
                  x-transition:enter-end="opacity-100 translate-y-0"
@@ -169,11 +153,6 @@
                         <p class="text-zatara-blue font-bold">✨ أهلاً بك مجدداً يا {{ auth('customer')->user()->name }}، لقد قمنا بتسريع خطوات الحجز من أجلك!</p>
                     </div>
                 @endif
-                        <div class="p-3 bg-zatara-red/10 border border-zatara-red/20 rounded-xl text-zatara-red text-sm font-medium animate-pulse">
-                            {{ $message }}
-                        </div>
-                    @enderror
-                </div>
 
                 <form wire:submit.prevent="submitPassengers" class="space-y-8">
                     @foreach($form->passengers as $index => $passenger)
@@ -202,14 +181,14 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div>
                                     <label class="block text-xs font-bold text-zatara-blue mb-2">الاسم الأول</label>
-                                    <input type="text" wire:model="form.passengers.{{ $index }}.first_name" placeholder="الاسم الأول"
+                                    <input type="text" wire:model.blur="form.passengers.{{ $index }}.first_name" placeholder="الاسم الأول"
                                            class="glass-input w-full px-4 py-3 text-slate-800 transition-colors {{ $errors->has("form.passengers.{$index}.first_name") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                     @error("form.passengers.{$index}.first_name") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
 
                                 <div>
                                     <label class="block text-xs font-bold text-zatara-blue mb-2">اسم العائلة</label>
-                                    <input type="text" wire:model="form.passengers.{{ $index }}.last_name" placeholder="اسم العائلة"
+                                    <input type="text" wire:model.blur="form.passengers.{{ $index }}.last_name" placeholder="اسم العائلة"
                                            class="glass-input w-full px-4 py-3 text-slate-800 transition-colors {{ $errors->has("form.passengers.{$index}.last_name") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                     @error("form.passengers.{$index}.last_name") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
@@ -234,7 +213,7 @@
 
                                 <div>
                                     <label class="block text-xs font-bold text-zatara-blue mb-2">رقم الوثيقة <span class="text-slate-400 font-normal">(اختياري)</span></label>
-                                    <input type="text" wire:model="form.passengers.{{ $index }}.document_number" dir="ltr" placeholder="رقم الهوية/الجواز"
+                                    <input type="text" wire:model.blur="form.passengers.{{ $index }}.document_number" dir="ltr" placeholder="رقم الهوية/الجواز"
                                            class="glass-input w-full px-4 py-3 text-slate-800 transition-colors {{ $errors->has("form.passengers.{$index}.document_number") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                     @error("form.passengers.{$index}.document_number") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
@@ -274,15 +253,16 @@
                     </button>
 
                     <div class="flex justify-end pt-6 border-t border-slate-100 mt-8">
-                        <button type="submit" class="btn-primary shadow-lg shadow-zatara-blue/20 px-12 py-4 text-lg">
-                            متابعة للإضافات
+                        <button type="submit" class="btn-primary flex-1 shadow-lg shadow-zatara-blue/20" wire:loading.attr="disabled">
+                            <span wire:loading.remove wire:target="submitPassengers">متابعة</span>
+                            <span wire:loading wire:target="submitPassengers">جاري الحفظ...</span>
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- STEP 4: Addons -->
-            <div x-show="step === 4" x-transition.opacity.duration.300ms style="display: none;" class="space-y-8">
+            <!-- STEP 3: Addons -->
+            <div x-show="step === 3" x-transition.opacity.duration.300ms style="display: none;" class="space-y-8">
                 <div class="mb-8 border-b border-slate-100 pb-6">
                     <h2 class="text-2xl font-bold text-zatara-blue">الإضافات الاختيارية</h2>
                     <p class="text-slate-500 text-sm mt-1">عزز تجربتك بإضافة هذه الخدمات المميزة.</p>
@@ -291,8 +271,8 @@
                 <form wire:submit.prevent="submitAddons" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         @forelse($tripInstance->addons ?? [] as $addon)
-                            <label class="relative flex flex-col p-6 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-xl hover:-translate-y-1 transition-all duration-300 has-[:checked]:border-zatara-gold has-[:checked]:bg-gradient-to-br has-[:checked]:from-zatara-gold/10 has-[:checked]:to-transparent overflow-hidden group">
-                                <input type="checkbox" wire:click="toggleAddon({{ $addon->id }})" 
+                            <label wire:click.prevent="toggleAddon({{ $addon->id }})" class="relative flex flex-col p-6 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-xl hover:-translate-y-1 transition-all duration-300 has-[:checked]:border-zatara-gold has-[:checked]:bg-gradient-to-br has-[:checked]:from-zatara-gold/10 has-[:checked]:to-transparent overflow-hidden group">
+                                <input type="checkbox" 
                                        @if(collect($form->addons)->contains('trip_addon_id', $addon->id)) checked @endif
                                        class="absolute top-6 left-6 w-6 h-6 rounded-lg border-slate-300 text-zatara-gold focus:ring-zatara-gold/50 cursor-pointer">
                                 
@@ -309,7 +289,7 @@
                                 <div class="mt-auto pt-4 border-t border-slate-100 group-has-[:checked]:border-zatara-gold/20 flex items-center justify-between">
                                     <span class="text-sm font-bold text-slate-400 group-has-[:checked]:text-zatara-gold">التكلفة الإضافية</span>
                                     <div class="font-black text-zatara-blue group-has-[:checked]:text-zatara-gold text-2xl">
-                                        +{{ number_format($addon->price) }} $
+                                        +{{ number_format($addon->price, 2) }} SAR
                                     </div>
                                 </div>
                             </label>
@@ -322,27 +302,65 @@
                     </div>
 
                     <div class="flex justify-between pt-6 border-t border-slate-100 mt-10">
-                        <button type="button" wire:click="$set('currentStep', 3)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">
+                        <button type="button" wire:click="$set('currentStep', 2)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">
                             السابق
                         </button>
                         <button type="submit" class="btn-primary shadow-lg shadow-zatara-blue/20 px-12 py-4 text-lg">
-                            متابعة للدفع
+                            <span wire:loading wire:target="submitAddons">جاري المعالجة...</span>
+                            <span wire:loading.remove wire:target="submitAddons">متابعة للدفع</span>
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- STEP 5: Payment Method & Summary -->
-            <div x-show="step === 5" x-transition.opacity.duration.300ms style="display: none;" class="space-y-8">
+            <!-- STEP 4: Payment Method & Summary -->
+            <div x-show="step === 4" x-transition.opacity.duration.300ms style="display: none;" class="space-y-8">
                 <div class="mb-8 border-b border-slate-100 pb-6">
                     <h2 class="text-2xl font-bold text-zatara-blue">طريقة الدفع والتأكيد</h2>
                     <p class="text-slate-500 text-sm mt-1">اختر طريقة الدفع المناسبة لك لإتمام الحجز.</p>
                 </div>
 
+                @if($packageOption)
+                    <div class="bg-zatara-blue/5 border border-zatara-blue/20 rounded-2xl p-5 mb-8 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-xl bg-zatara-blue/10 flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-zatara-blue text-2xl">hotel</span>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-zatara-blue text-lg flex items-center gap-2">
+                                {{ $packageOption->hotel_name ?? $packageOption->name }}
+                                @if($packageOption->stars)
+                                    <span class="text-zatara-gold text-sm">{{ str_repeat('★', $packageOption->stars) }}</span>
+                                @endif
+                            </h3>
+                            <div class="text-sm text-slate-500 mt-1 flex items-center gap-3">
+                                <span>{{ $packageOption->name }}</span>
+                                @if($packageOption->room_type)
+                                    <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                                    <span>{{ $packageOption->room_type }}</span>
+                                @endif
+                                @if($packageOption->meal_plan)
+                                    <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                                    <span>{{ $packageOption->meal_plan }}</span>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="text-left shrink-0">
+                            <div class="text-sm text-slate-400 mb-1">رسوم الباقة</div>
+                            @if($packageOption->price_adjustment > 0)
+                                <div class="font-black text-zatara-gold text-xl">+${{ number_format($packageOption->price_adjustment) }}</div>
+                            @elseif($packageOption->price_adjustment == 0)
+                                <div class="font-black text-green-600 text-lg">مشمول مجاناً</div>
+                            @else
+                                <div class="font-black text-green-600 text-xl">-${{ number_format(abs($packageOption->price_adjustment)) }}</div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+
                 <form wire:submit.prevent="submitBooking" class="space-y-8">
                     
                     <!-- Payment Type Selection (Full vs Deposit) -->
-                    @if($tripInstance->tripTemplate->deposit_enabled)
+                    @if($tripInstance->tripTemplate?->deposit_enabled)
                         <div class="mb-8">
                             <h3 class="text-lg font-bold text-zatara-blue mb-4">خطة الدفع</h3>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -363,7 +381,7 @@
                                     <input type="radio" wire:model.live="paymentType" value="deposit" class="sr-only">
                                     <div class="flex-1 flex justify-between items-center">
                                         <div>
-                                            <span class="block font-bold text-zatara-blue">دفع عربون ({{ $tripInstance->tripTemplate->deposit_percentage ?? 100 }}%)</span>
+                                            <span class="block font-bold text-zatara-blue">دفع عربون ({{ $tripInstance->tripTemplate?->deposit_percentage ?? 100 }}%)</span>
                                             <span class="block text-sm text-slate-500">ادفع عربون لتأكيد حجزك وادفع الباقي لاحقاً</span>
                                         </div>
                                         <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors border-slate-300" :class="{ 'border-zatara-blue': $wire.paymentType === 'deposit' }">
@@ -382,7 +400,7 @@
                         <label class="relative flex flex-col p-6 bg-slate-50 border border-slate-200 rounded-3xl cursor-not-allowed opacity-70">
                             <!-- Premium Coming Soon Badge -->
                             <div class="absolute -top-3 left-6 bg-gradient-to-r from-zatara-gold to-[#b8911f] text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-lg border border-[#e8c86b]">
-                                قريباً (Coming Soon)
+                                قريباً
                             </div>
                             <input type="radio" wire:model.live="paymentMethod" value="stripe" class="sr-only" disabled>
                             <div class="flex justify-between items-center mb-6">
@@ -430,8 +448,8 @@
                     </div>
 
                     <div class="flex justify-between pt-6 border-t border-slate-100 mt-10">
-                        <button type="button" wire:click="$set('currentStep', 4)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">
-                            السابق
+                        <button type="button" wire:click="$set('currentStep', 3)" class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 rounded-2xl transition-all disabled:opacity-50" wire:loading.attr="disabled">
+                            تراجع
                         </button>
                         <button type="submit" class="btn-secondary px-10 py-4 text-lg flex items-center justify-center gap-2 relative disabled:opacity-75" wire:loading.attr="disabled" wire:target="submitBooking">
                             <span wire:loading.remove wire:target="submitBooking" class="flex items-center justify-center gap-2">

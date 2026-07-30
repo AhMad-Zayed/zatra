@@ -51,7 +51,7 @@ class MyBookings extends Component
 
     public function render()
     {
-        $bookings = Booking::with(['tripInstance.tripTemplate'])
+        $bookings = Booking::with(['tripInstance.tripTemplate', 'passengers'])
             ->where('tenant_id', $this->tenant->id)
             ->where('customer_id', Auth::guard('customer')->id())
             ->orderByDesc('created_at')

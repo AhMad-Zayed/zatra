@@ -3,12 +3,15 @@
 namespace App\Filament\Resources\BookingResource\RelationManagers;
 
 use Filament\Forms;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PassengersRelationManager extends RelationManager
 {
@@ -23,28 +26,61 @@ class PassengersRelationManager extends RelationManager
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->label('اسم المسافر الكامل')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('passport_number')
-                    ->label('رقم جواز السفر')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Textarea::make('special_requirements')
-                    ->label('متطلبات خاصة بالمسافر')
-                    ->rows(2)
-                    ->nullable()
-                    ->columnSpanFull(),
+                Forms\Components\Grid::make(2)->schema([
+                    TextInput::make('first_name')
+                        ->label('الاسم الأول')
+                        ->required()
+                        ->maxLength(255),
+                    TextInput::make('last_name')
+                        ->label('اسم العائلة')
+                        ->required()
+                        ->maxLength(255),
+                    Select::make('document_type')
+                        ->label('نوع الوثيقة')
+                        ->options([
+                            'national_id' => 'هوية وطنية',
+                            'passport'    => 'جواز سفر',
+                        ])
+                        ->required(),
+                    TextInput::make('document_number')
+                        ->label('رقم الوثيقة')
+                        ->required()
+                        ->maxLength(255),
+                    DatePicker::make('date_of_birth')
+                        ->label('تاريخ الميلاد')
+                        ->nullable(),
+                    Select::make('gender')
+                        ->label('الجنس')
+                        ->options(['male' => 'ذكر', 'female' => 'أنثى'])
+                        ->nullable(),
+                    Select::make('trip_passenger_category_id')
+                        ->label('فئة المسافر (الباقة)')
+                        ->options(fn ($livewire) =>
+                            $livewire->ownerRecord
+                                ?->tripInstance
+                                ?->tripPassengerCategories
+                                ?->pluck('name', 'id') ?? []
+                        )
+                        ->required(),
+                    Select::make('pickup_point_id')
+                        ->label('نقطة التجمع')
+                        ->options(fn ($livewire) =>
+                            \App\Models\PickupPoint::whereHas('pickupRoute.tripInstances', fn ($q) =>
+                                $q->where('trip_instances.id', $livewire->ownerRecord?->trip_instance_id)
+                            )->pluck('name', 'id')
+                        )
+                        ->nullable(),
+                ]),
+
                 Forms\Components\Section::make('وثائق المسافر')
                     ->schema([
                         Forms\Components\SpatieMediaLibraryFileUpload::make('passport')
                             ->label('تحميل صورة الجواز')
-                            ->collection('passport')
+                            ->collection('identity_documents')
                             ->maxSize(5120),
                         Forms\Components\SpatieMediaLibraryFileUpload::make('national_id')
                             ->label('تحميل صورة الهوية')
-                            ->collection('national_id')
+                            ->collection('identity_documents')
                             ->maxSize(5120),
                     ])
                     ->columns(2),
@@ -54,34 +90,47 @@ class PassengersRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('name')
+            ->recordTitleAttribute('first_name')
             ->columns([
-                Tables\Columns\TextColumn::make('name')
-                    ->label('اسم المسافر')
+                TextColumn::make('first_name')
+                    ->label('الاسم الأول')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('passport_number')
-                    ->label('رقم الجواز')
+                TextColumn::make('last_name')
+                    ->label('اسم العائلة')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('special_requirements')
-                    ->label('المتطلبات الخاصة')
-                    ->limit(50),
+                TextColumn::make('document_type')
+                    ->label('نوع الوثيقة')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'national_id' => 'هوية وطنية',
+                        'passport'    => 'جواز سفر',
+                        default       => $state,
+                    }),
+                TextColumn::make('document_number')
+                    ->label('رقم الوثيقة')
+                    ->searchable(),
+                TextColumn::make('tripPassengerCategory.name')
+                    ->label('الفئة')
+                    ->placeholder('—'),
+                TextColumn::make('pickupPoint.name')
+                    ->label('نقطة التجمع')
+                    ->placeholder('—'),
             ])
             ->filters([
                 //
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->label('إضافة مسافر جديد للرحلة')
+                    ->label('إضافة مسافر جديد')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['tenant_id'] = $this->getOwnerRecord()->tenant_id;
                         return $data;
                     }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()->label('تعديل'),
+                Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

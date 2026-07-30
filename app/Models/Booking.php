@@ -17,6 +17,7 @@ class Booking extends Model
     protected $fillable = [
         'tenant_id',
         'trip_instance_id',
+        'package_option_id',
         'customer_id',
         'user_id',
         'pnr',
@@ -29,6 +30,15 @@ class Booking extends Model
         'payment_type',
         'notes',
         'expires_at',
+        'snapshot_trip_title',
+        'snapshot_template_name',
+        'snapshot_start_date',
+        'snapshot_end_date',
+        'snapshot_currency',
+        'snapshot_total_price',
+        'snapshot_taxes',
+        'snapshot_discounts',
+        'snapshot_passenger_rules',
     ];
 
     protected $casts = [
@@ -36,8 +46,12 @@ class Booking extends Model
         'payment_status' => PaymentStatus::class,
         'grand_total' => \App\Casts\MoneyCast::class,
         'total_paid' => \App\Casts\MoneyCast::class,
+        'balance_due' => \App\Casts\MoneyCast::class,
         'deposit_amount' => \App\Casts\MoneyCast::class,
         'expires_at' => 'datetime',
+        'snapshot_start_date' => 'date',
+        'snapshot_end_date' => 'date',
+        'snapshot_passenger_rules' => 'array',
     ];
 
     public function getBalanceDueAttribute(): float|int
@@ -59,6 +73,26 @@ class Booking extends Model
                 $model->uuid = (string) \Illuminate\Support\Str::uuid();
             }
         });
+
+        static::updating(function ($model) {
+            $snapshotFields = [
+                'snapshot_trip_title',
+                'snapshot_template_name',
+                'snapshot_start_date',
+                'snapshot_end_date',
+                'snapshot_currency',
+                'snapshot_total_price',
+                'snapshot_taxes',
+                'snapshot_discounts',
+                'snapshot_passenger_rules',
+            ];
+
+            foreach ($snapshotFields as $field) {
+                if ($model->isDirty($field) && $model->getOriginal($field) !== null) {
+                    throw new \Exception("Cannot modify immutable snapshot field: {$field}");
+                }
+            }
+        });
     }
 
     public function tenant(): BelongsTo
@@ -69,6 +103,11 @@ class Booking extends Model
     public function tripInstance(): BelongsTo
     {
         return $this->belongsTo(TripInstance::class);
+    }
+
+    public function packageOption(): BelongsTo
+    {
+        return $this->belongsTo(PackageOption::class);
     }
 
     public function user(): BelongsTo

@@ -14,9 +14,16 @@ class TripTemplate extends Model implements HasMedia
 {
     use HasFactory, SoftDeletes, InteractsWithMedia;
 
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images');
+    }
+
     protected $fillable = [
         'tenant_id',
         'title',
+        'slug',
+        'is_active',
         'description',
         'base_price',
         'passenger_requirements',
@@ -26,6 +33,7 @@ class TripTemplate extends Model implements HasMedia
     ];
 
     protected $casts = [
+        'is_active' => 'boolean',
         'base_price' => \App\Casts\MoneyCast::class,
         'passenger_requirements' => 'array',
         'deposit_enabled' => 'boolean',
@@ -58,5 +66,20 @@ class TripTemplate extends Model implements HasMedia
     public function requirementPreset(): BelongsTo
     {
         return $this->belongsTo(RequirementPreset::class);
+    }
+    
+    protected static function booted()
+    {
+        static::creating(function ($template) {
+            if (empty($template->slug)) {
+                $template->slug = \Illuminate\Support\Str::slug($template->title . '-' . uniqid());
+            }
+        });
+        
+        static::updating(function ($template) {
+            if (empty($template->slug)) {
+                $template->slug = \Illuminate\Support\Str::slug($template->title . '-' . $template->id);
+            }
+        });
     }
 }

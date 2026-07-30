@@ -45,6 +45,9 @@ class TripTemplateResource extends Resource
                             ->label('اسم القالب / الرحلة')
                             ->required()
                             ->maxLength(255),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('فعال')
+                            ->default(true),
                         Forms\Components\TextInput::make('base_price')
                             ->label('السعر الأساسي (الافتراضي)')
                             ->numeric()
@@ -75,6 +78,7 @@ class TripTemplateResource extends Resource
                     ->schema([
                         Forms\Components\Repeater::make('templatePassengerCategories')
                             ->relationship()
+                            ->minItems(1)
                             ->label('الفئات')
                             ->schema([
                                 Forms\Components\Select::make('global_pricing_tier_id')
@@ -232,17 +236,55 @@ class TripTemplateResource extends Resource
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('فعال')
+                    ->boolean(),
             ])
             ->filters([
                 //
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->before(function (Tables\Actions\DeleteAction $action, TripTemplate $record) {
+                        $hasInstances = $record->tripInstances()->count() > 0;
+                        if ($hasInstances) {
+                            \Filament\Notifications\Notification::make()
+                                ->warning()
+                                ->title('لا يمكن حذف القالب')
+                                ->body('يحتوي هذا القالب على مواعيد رحلات. يرجى إلغاء تفعيله (أرشفته) بدلاً من حذفه.')
+                                ->persistent()
+                                ->send();
+
+                            $action->cancel();
+                        }
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->action(function (Tables\Actions\DeleteBulkAction $action, \Illuminate\Database\Eloquent\Collection $records) {
+                            $hasActive = false;
+                            foreach ($records as $record) {
+                                if ($record->tripInstances()->count() > 0) {
+                                    $hasActive = true;
+                                    break;
+                                }
+                            }
+                            
+                            if ($hasActive) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('لا يمكن حذف بعض القوالب')
+                                    ->body('تحتوي بعض القوالب المحددة على مواعيد رحلات. يرجى إلغاء تفعيلها بدلاً من حذفها.')
+                                    ->persistent()
+                                    ->send();
+                                
+                                $action->cancel();
+                            } else {
+                                $records->each->delete();
+                            }
+                        }),
                 ]),
             ]);
     }

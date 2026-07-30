@@ -50,6 +50,18 @@ class TripInstance extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+    public function packageOptions(): HasMany
+    {
+        return $this->hasMany(PackageOption::class)->orderBy('sort_order');
+    }
+
+    public function activePackageOptions(): HasMany
+    {
+        return $this->hasMany(PackageOption::class)
+                    ->where('is_active', true)
+                    ->orderBy('sort_order');
+    }
+
     public function waitingLists(): HasMany
     {
         return $this->hasMany(WaitingList::class);
@@ -92,5 +104,11 @@ class TripInstance extends Model implements HasMedia
             $q->where('trip_instance_id', $this->id)
               ->whereIn('booking_status', [\App\Enums\BookingStatus::Confirmed, \App\Enums\BookingStatus::Pending]);
         })->with('bookingAddons.tripAddon')->get()->groupBy('id');
+    }
+
+    public function scopeBookable($query)
+    {
+        return $query->where('status', \App\Enums\TripStatusEnum::Active)
+                     ->where('start_date', '>=', now()->startOfDay());
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Passenger;
 use App\Models\BookingAddon;
 use App\Models\TripInstance;
+use App\Models\PackageOption;
 use App\Models\TripAddon;
 use App\Models\TripPassengerCategory;
 use App\Exceptions\InventoryExhaustedException;
@@ -38,7 +39,7 @@ class CreateBookingService
         $creatorUserId = $data['user_id'] ?? null;
         $notes = $data['notes'] ?? null;
 
-        return DB::transaction(function () use ($tenantId, $tripInstanceId, $customerId, $passengersData, $addonsData, $creatorUserId, $notes) {
+        return DB::transaction(function () use ($data, $tenantId, $tripInstanceId, $customerId, $passengersData, $addonsData, $creatorUserId, $notes) {
             
             // 1. Lock the TripInstance for update to prevent race conditions on inventory
             $tripInstance = TripInstance::where('id', $tripInstanceId)
@@ -124,6 +125,7 @@ class CreateBookingService
             $booking = Booking::create([
                 'tenant_id' => $tenantId,
                 'trip_instance_id' => $tripInstanceId,
+                'package_option_id' => $data['package_option_id'] ?? null,
                 'customer_id' => $customerId, // The actual owner of the booking
                 'user_id' => $creatorUserId, // Audit trail: The Admin who created this (Null for self-checkout)
                 'pnr' => $pnr,
@@ -202,10 +204,32 @@ class CreateBookingService
                 $totalAmount += ($addon->price * $aData['quantity']);
             }
 
-            // 6. Update Final Totals
+            // Calculate Package Adjustment and Validate
+            $packageAdjustment = 0;
+            if (!empty($data['package_option_id'])) {
+                $package = PackageOption::lockForUpdate()->find($data['package_option_id']);
+                
+                if ($package && $package->remaining_seats < count($passengersData)) {
+                    throw new \App\Exceptions\InsufficientSeatsException('لا توجد مقاعد كافية في هذه الباقة');
+                }
+                
+                $packageAdjustment = $package?->price_adjustment ?? 0;
+                $totalAmount += $packageAdjustment;
+            }
+
+            // 6. Update Final Totals and Snapshots
             $booking->update([
                 'grand_total' => $totalAmount,
                 'balance_due' => $totalAmount,
+                'snapshot_trip_title' => $tripInstance->tripTemplate?->title ?? 'Unknown Trip',
+                'snapshot_template_name' => $tripInstance->tripTemplate?->title ?? 'Unknown Template',
+                'snapshot_start_date' => $tripInstance->start_date,
+                'snapshot_end_date' => $tripInstance->end_date,
+                'snapshot_currency' => $tripInstance->tenant->currency ?? 'USD',
+                'snapshot_total_price' => $totalAmount,
+                'snapshot_taxes' => 0, // Simplified for now
+                'snapshot_discounts' => 0, // Simplified for now
+                'snapshot_passenger_rules' => $tripInstance->tripTemplate?->passenger_requirements ?? [],
             ]);
 
             // Dispatch Event for Background Notifications

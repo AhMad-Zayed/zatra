@@ -1,4 +1,4 @@
-<div>
+<div x-data="{ showGallery: false }">
     {{-- ========================== 
          ZATARA GLOBAL UI (2026) - TRIP DETAILS
          Aesthetic: Aerodynamic Clarity, Glassmorphism
@@ -10,7 +10,7 @@
         <nav class="flex text-sm text-slate-500 mb-6 font-medium">
             <a href="{{ route('storefront.catalog', ['tenant' => $tenant->slug]) }}" class="hover:text-zatara-blue transition-colors">الرئيسية</a>
             <span class="mx-2">/</span>
-            <span class="text-zatara-blue">{{ $instance->tripTemplate->title }}</span>
+            <span class="text-zatara-blue">{{ $template->title }}</span>
         </nav>
 
         @if (session()->has('error'))
@@ -32,16 +32,18 @@
         <div class="flex flex-col md:flex-row justify-between items-start gap-6 mb-8">
             <div>
                 <h1 class="text-4xl md:text-5xl font-bold text-zatara-blue leading-tight mb-4">
-                    {{ $instance->tripTemplate->title }}
+                    {{ $template->title }}
                 </h1>
                 <div class="flex items-center gap-6 text-slate-500 font-medium">
                     <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-zatara-gold">calendar_month</span>
-                        <span>{{ $instance->start_date->format('d M, Y') }} - {{ $instance->end_date->format('d M, Y') }}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="material-symbols-outlined text-zatara-gold">group</span>
-                        <span>مجموعة (حتى {{ $instance->capacity }} شخص)</span>
+                        @if($instances->count() == 1 && $selectedInstance)
+                            <span>{{ $selectedInstance->start_date->format('d M, Y') }} - {{ $selectedInstance->end_date->format('d M, Y') }}</span>
+                        @elseif($instances->count() > 1)
+                            <span>متوفرة في {{ $instances->count() }} مواعيد</span>
+                        @else
+                            <span>{{ $template->duration_days ? $template->duration_days . ' أيام' : 'لا توجد مواعيد متاحة' }}</span>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -50,46 +52,60 @@
             <div class="glass-panel p-4 rounded-3xl shrink-0 text-center md:text-right hidden md:block">
                 <p class="text-xs text-slate-400 mb-1">السعر يبدأ من</p>
                 <div class="text-3xl font-black text-zatara-blue">
-                    {{ number_format($instance->tripPassengerCategories->min('price') ?? $instance->tripTemplate->base_price) }} <span class="text-base font-medium">دولار</span>
+                    {{ number_format($template->base_price ?? 0) }} <span class="text-base font-medium">دولار</span>
                 </div>
             </div>
         </div>
 
         {{-- MASONRY GALLERY --}}
         @php
-            $media = collect([
-                $instance->getFirstMediaUrl('trip_images'),
-                $instance->tripTemplate->getFirstMediaUrl('trip_images')
-            ])->filter()->first();
+            $templateMedia = $template->getMedia('trip_images') ?? collect();
+            $mediaList = $templateMedia;
             
-            $mainImg = $media ?: 'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=1200&q=80';
-            $img2 = $media ?: 'https://images.unsplash.com/photo-1544550581-5f7ceaf7f992?w=600&q=80';
-            $img3 = $media ?: 'https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=600&q=80';
-            $img4 = $media ?: 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800&q=80';
+            $mainImg = $mediaList->count() > 0 ? $mediaList[0]->getUrl() : asset('images/placeholder.jpg');
+            $img2 = $mediaList->count() > 1 ? $mediaList[1]->getUrl() : null;
+            $img3 = $mediaList->count() > 2 ? $mediaList[2]->getUrl() : null;
+            $img4 = $mediaList->count() > 3 ? $mediaList[3]->getUrl() : null;
+            
+            $hasMultiple = $mediaList->count() > 1;
         @endphp
         <div class="grid grid-cols-4 grid-rows-2 gap-4 h-[60vh] rounded-[2.5rem] overflow-hidden">
-            <div class="col-span-4 md:col-span-2 row-span-2 relative group">
-                <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Main Destination">
+            <div class="{{ $hasMultiple ? 'col-span-4 md:col-span-2 row-span-2' : 'col-span-4 row-span-2' }} relative group">
+                <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
             </div>
-            <div class="col-span-2 md:col-span-1 row-span-1 relative group">
-                <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Destination View">
+            @if($hasMultiple)
+            <div class="col-span-2 md:col-span-1 row-span-1 relative group bg-slate-100">
+                @if($img2)
+                    <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                @else
+                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
+                @endif
             </div>
-            <div class="col-span-2 md:col-span-1 row-span-1 relative group">
-                <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Activity">
+            <div class="col-span-2 md:col-span-1 row-span-1 relative group bg-slate-100">
+                @if($img3)
+                    <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                @else
+                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
+                @endif
             </div>
-            <div class="col-span-4 md:col-span-2 row-span-1 relative group">
-                <img src="{{ $img4 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="Hotel">
+            <div class="col-span-4 md:col-span-2 row-span-1 relative group bg-slate-100">
+                @if($img4)
+                    <img src="{{ $img4 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                @else
+                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
+                @endif
                 {{-- View All Photos Button --}}
-                <button class="absolute bottom-4 right-4 glass-panel px-6 py-2 rounded-xl font-bold text-zatara-blue hover:bg-white transition-colors flex items-center gap-2">
+                <button @click="showGallery = true" class="absolute bottom-4 right-4 glass-panel px-6 py-2 rounded-xl font-bold text-zatara-blue hover:bg-white transition-colors flex items-center gap-2">
                     <span class="material-symbols-outlined">photo_library</span>
                     شاهد جميع الصور
                 </button>
             </div>
+            @endif
         </div>
     </section>
 
     {{-- CONTENT & STICKY BOOKING WIDGET --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32 lg:pb-0">
         <div class="flex flex-col lg:flex-row gap-12 relative">
             
             {{-- MAIN CONTENT (Left Side) --}}
@@ -98,7 +114,7 @@
                 <div class="mb-12">
                     <h2 class="text-2xl font-bold text-zatara-blue mb-4">عن الرحلة</h2>
                     <div class="text-slate-600 font-light leading-loose text-lg prose">
-                        {!! $instance->tripTemplate->description ?? 'لا توجد تفاصيل إضافية مسجلة لهذه الرحلة حتى الآن.' !!}
+                        {!! $template->description ?? 'لا توجد تفاصيل إضافية مسجلة لهذه الرحلة حتى الآن.' !!}
                     </div>
                 </div>
 
@@ -106,107 +122,174 @@
                 <div class="mb-12">
                     <h2 class="text-2xl font-bold text-zatara-blue mb-8">مسار الرحلة الممتع</h2>
                     
-                    <div class="relative border-r-2 border-zatara-blue/10 pr-8 space-y-12">
-                        
-                        {{-- Day 1 --}}
-                        <div class="relative">
-                            <div class="absolute -right-11 w-6 h-6 rounded-full bg-zatara-gold border-4 border-white flex items-center justify-center shadow-md"></div>
-                            <h3 class="text-xl font-bold text-zatara-blue mb-2">اليوم الأول: الوصول والاستقبال</h3>
-                            <p class="text-slate-500 font-light leading-relaxed">
-                                الاستقبال في المطار من قبل مندوبنا، والتوجه إلى الفندق الفاخر للاستراحة بعد عناء السفر. في المساء، جولة حرة خفيفة للتعرف على محيط الفندق.
-                            </p>
-                            <div class="mt-4 flex gap-4">
-                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">flight_land</span> وصول المطار</span>
-                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">hotel</span> إقامة فندقية 5 نجوم</span>
-                            </div>
+                    @if($template->itinerary_data && is_array($template->itinerary_data) && count($template->itinerary_data) > 0)
+                        <div class="relative border-r-2 border-zatara-blue/10 pr-8 space-y-12">
+                            @foreach($template->itinerary_data as $index => $day)
+                                <div class="relative">
+                                    <div class="absolute -right-11 w-6 h-6 rounded-full bg-zatara-blue border-4 border-white flex items-center justify-center shadow-md"></div>
+                                    <h3 class="text-xl font-bold text-zatara-blue mb-2">{{ $day['title'] ?? 'اليوم ' . ($index + 1) }}</h3>
+                                    <p class="text-slate-500 font-light leading-relaxed">
+                                        {{ $day['description'] ?? '' }}
+                                    </p>
+                                </div>
+                            @endforeach
                         </div>
-
-                        {{-- Day 2 --}}
-                        <div class="relative">
-                            <div class="absolute -right-11 w-6 h-6 rounded-full bg-zatara-blue border-4 border-white flex items-center justify-center shadow-md"></div>
-                            <h3 class="text-xl font-bold text-zatara-blue mb-2">اليوم الثاني: جولة المدينة التاريخية</h3>
-                            <p class="text-slate-500 font-light leading-relaxed">
-                                بعد الإفطار، تبدأ جولتنا لاستكشاف أهم المعالم التاريخية والثقافية للمدينة مع مرشد سياحي مختص. تناول الغداء في مطعم تقليدي.
-                            </p>
-                            <div class="mt-4 flex gap-4">
-                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-lg text-sm font-medium flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">museum</span> المعالم التاريخية</span>
-                            </div>
+                    @else
+                        <div class="bg-slate-50 rounded-2xl p-8 text-center text-slate-400">
+                            لم يتم إضافة مسار تفصيلي لهذه الرحلة بعد.
                         </div>
-
-                        {{-- Final Day --}}
-                        <div class="relative">
-                            <div class="absolute -right-11 w-6 h-6 rounded-full bg-slate-300 border-4 border-white flex items-center justify-center shadow-md"></div>
-                            <h3 class="text-xl font-bold text-slate-600 mb-2">يوم المغادرة</h3>
-                            <p class="text-slate-500 font-light leading-relaxed">
-                                التوجه إلى المطار للعودة إلى أرض الوطن محملين بأجمل الذكريات.
-                            </p>
-                        </div>
-
-                    </div>
+                    @endif
                 </div>
-                
-                {{-- Addons --}}
-                @if($instance->tripAddons->count() > 0)
-                <div class="mb-12">
-                    <h2 class="text-2xl font-bold text-zatara-blue mb-4">الإضافات المتاحة</h2>
-                    <ul class="list-disc list-inside text-slate-600 font-light leading-loose text-lg">
-                        @foreach($instance->tripAddons as $addon)
-                            <li>{{ $addon->name }} - {{ number_format($addon->price) }} دولار</li>
-                        @endforeach
-                    </ul>
-                </div>
-                @endif
             </div>
 
             {{-- STICKY BOOKING WIDGET (Right Side) --}}
             <div class="w-full lg:w-96 shrink-0 relative">
                 <div class="sticky top-32 glass-panel rounded-3xl p-6 shadow-2xl shadow-zatara-blue/5">
                     
-                    <div class="text-center mb-6 border-b border-slate-100 pb-6">
-                        <p class="text-sm text-slate-400 mb-1">احجز مقعدك الآن</p>
-                        <div class="text-4xl font-black text-zatara-blue">
-                            {{ number_format($instance->tripPassengerCategories->min('price') ?? $instance->tripTemplate->base_price) }} <span class="text-lg font-medium text-slate-500">دولار</span>
+                    @if($instances->isEmpty())
+                        <div class="text-center py-8">
+                            <span class="material-symbols-outlined text-5xl text-slate-300 mb-4">event_busy</span>
+                            <h3 class="text-xl font-bold text-zatara-blue mb-2">لا توجد رحلات قادمة</h3>
+                            <p class="text-slate-500 text-sm mb-6">سنقوم بتحديث المواعيد قريباً.</p>
+                            <button class="btn-secondary w-full py-3">أعلمني عند توفر مقاعد</button>
                         </div>
-                        <p class="text-xs text-zatara-red font-medium mt-2 bg-zatara-red/10 py-1 px-3 rounded-full inline-block">
-                            <span class="material-symbols-outlined text-[14px] align-middle">local_fire_department</span>
-                            مقاعد محدودة متبقية!
-                        </p>
-                    </div>
-
-                    <div class="space-y-4 mb-6">
-                        {{-- Date Selector --}}
-                        <div class="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-zatara-blue transition-colors">
-                            <div>
-                                <p class="text-xs text-slate-400 font-medium">تاريخ المغادرة</p>
-                                <p class="font-bold text-zatara-blue">{{ $instance->start_date->format('d M, Y') }}</p>
-                            </div>
-                            <span class="material-symbols-outlined text-zatara-gold">edit_calendar</span>
-                        </div>
-                        
-                        {{-- Guests Selector --}}
-                        <div class="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-zatara-blue transition-colors">
-                            <div>
-                                <p class="text-xs text-slate-400 font-medium">المسافرين</p>
-                                <p class="font-bold text-zatara-blue">1 بالغ</p>
-                            </div>
-                            <span class="material-symbols-outlined text-zatara-gold">person_add</span>
-                        </div>
-                    </div>
-
-                    @if($instance->remaining_seats > 0)
-                        <a href="{{ route('storefront.checkout', ['tenant' => $tenant->slug, 'tripInstance' => $instance->id]) }}" class="btn-secondary w-full block text-center text-lg shadow-xl shadow-zatara-gold/20 animate-pulse hover:animate-none">
-                            بدء إجراءات الحجز
-                        </a>
-                        <p class="text-center text-xs text-slate-400 font-light mt-4">
-                            لن يتم الخصم من بطاقتك الآن.
-                        </p>
                     @else
-                        <button disabled class="w-full block text-center text-lg px-6 py-4 font-bold text-slate-500 bg-slate-200 rounded-2xl cursor-not-allowed">
-                            مكتملة العدد (Sold Out)
-                        </button>
-                        <p class="text-center text-xs text-slate-400 font-light mt-4">
-                            للأسف، لا توجد مقاعد شاغرة لهذه الرحلة.
-                        </p>
+                        <div class="text-center mb-6 border-b border-slate-100 pb-6">
+                            <p class="text-sm text-slate-400 mb-1">احجز مقعدك الآن</p>
+                            <div class="text-4xl font-black text-zatara-blue">
+                                @if($hasVariablePricing && $selectedInstance)
+                                    {{ number_format($selectedInstance->price_override ? $selectedInstance->price_override_amount : ($template->base_price ?? 0)) }}
+                                @else
+                                    {{ number_format($template->base_price ?? 0) }}
+                                @endif
+                                <span class="text-lg font-medium text-slate-500">دولار</span>
+                            </div>
+                            @if($selectedInstance && $selectedInstance->remaining_seats <= 10 && $selectedInstance->remaining_seats > 0)
+                                <p class="text-xs text-zatara-red font-medium mt-2 bg-zatara-red/10 py-1 px-3 rounded-full inline-block">
+                                    <span class="material-symbols-outlined text-[14px] align-middle">local_fire_department</span>
+                                    متبقي {{ $selectedInstance->remaining_seats }} مقاعد فقط!
+                                </p>
+                            @endif
+                        </div>
+
+                        <div class="space-y-4 mb-6">
+                            {{-- Date Selector --}}
+                            @if($instances->count() == 1)
+                                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex justify-between items-center">
+                                    <div>
+                                        <p class="text-xs text-slate-400 font-medium">تاريخ المغادرة</p>
+                                        <p class="font-bold text-zatara-blue">{{ $selectedInstance->start_date->format('d M, Y') }}</p>
+                                    </div>
+                                    <span class="material-symbols-outlined text-slate-400">event_available</span>
+                                </div>
+                            @else
+                                <div>
+                                    <label class="block text-xs text-slate-500 font-bold mb-2">اختر تاريخ المغادرة</label>
+                                    <select wire:model.live="selectedInstanceId" class="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 font-bold text-zatara-blue focus:ring-2 focus:ring-zatara-blue focus:border-transparent outline-none">
+                                        @foreach($instances as $inst)
+                                            <option value="{{ $inst->id }}">
+                                                {{ $inst->start_date->format('d M, Y') }} 
+                                                @if($hasVariablePricing)
+                                                    - {{ number_format($inst->price_override ? $inst->price_override_amount : ($template->base_price ?? 0)) }}$
+                                                @endif
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            @endif
+                            
+                            {{-- Guests Selector --}}
+                            <div class="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-zatara-blue transition-colors">
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">المسافرين</p>
+                                    <p class="font-bold text-zatara-blue">1 بالغ</p>
+                                </div>
+                                <span class="material-symbols-outlined text-zatara-gold">person_add</span>
+                            </div>
+                        </div>
+
+                        @if($this->availablePackages->count() > 0)
+                            <div class="mb-4">
+                                <p class="text-xs text-slate-400 font-bold mb-3">اختر الباقة</p>
+                                <div class="space-y-2">
+                                    @foreach($this->availablePackages as $package)
+                                        <label wire:key="pkg-{{ $package->id }}"
+                                               class="flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all
+                                                      {{ $selectedPackageId == $package->id 
+                                                         ? 'border-zatara-blue bg-zatara-blue/5' 
+                                                         : 'border-slate-200 hover:border-zatara-blue/40' }}
+                                                      {{ $package->remaining_seats <= 0 ? 'opacity-40 cursor-not-allowed' : '' }}">
+                                            <input type="radio" 
+                                                   wire:model.live="selectedPackageId" 
+                                                   value="{{ $package->id }}"
+                                                   {{ $package->remaining_seats <= 0 ? 'disabled' : '' }}
+                                                   class="sr-only">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="font-bold text-zatara-blue text-sm">
+                                                        {{ $package->hotel_name ?? $package->name }}
+                                                    </span>
+                                                    @if($package->stars)
+                                                        <span class="text-zatara-gold text-xs">
+                                                            {{ str_repeat('★', $package->stars) }}
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                @if($package->room_type || $package->meal_plan)
+                                                    <p class="text-xs text-slate-400 mt-0.5">
+                                                        {{ $package->room_type }} 
+                                                        {{ $package->room_type && $package->meal_plan ? '·' : '' }} 
+                                                        {{ $package->meal_plan }}
+                                                    </p>
+                                                @endif
+                                                @if($package->remaining_seats <= 5 && $package->remaining_seats > 0)
+                                                    <p class="text-xs text-red-500 mt-0.5">
+                                                        ⚠ متبقي {{ $package->remaining_seats }} فقط
+                                                    </p>
+                                                @elseif($package->remaining_seats <= 0)
+                                                    <p class="text-xs text-slate-400 mt-0.5">مكتملة</p>
+                                                @endif
+                                            </div>
+                                            <div class="shrink-0 text-right">
+                                                @if($package->price_adjustment > 0)
+                                                    <span class="text-zatara-gold font-black text-sm">
+                                                        +{{ number_format($package->price_adjustment / 100) }}$
+                                                    </span>
+                                                @elseif($package->price_adjustment == 0)
+                                                    <span class="text-green-600 font-bold text-xs">مشمول</span>
+                                                @else
+                                                    <span class="text-green-600 font-bold text-xs">
+                                                        -{{ number_format(abs($package->price_adjustment) / 100) }}$
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            
+                            <div class="border-t border-slate-100 pt-4 mb-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm text-slate-500">السعر النهائي</span>
+                                    <span class="text-2xl font-black text-zatara-blue">
+                                        ${{ number_format($this->finalPrice / 100) }}
+                                    </span>
+                                </div>
+                            </div>
+                        @endif
+
+                        @if($selectedInstance && $selectedInstance->remaining_seats > 0)
+                            <a href="{{ route('storefront.checkout', ['tenant' => $tenant->slug, 'tripInstance' => $selectedInstance->id, 'package' => $selectedPackageId]) }}" class="btn-secondary w-full block text-center text-lg shadow-xl shadow-zatara-gold/20 animate-pulse hover:animate-none py-3">
+                                بدء إجراءات الحجز
+                            </a>
+                            <p class="text-center text-xs text-slate-400 font-light mt-4">
+                                لن يتم الخصم من بطاقتك الآن.
+                            </p>
+                        @else
+                            <button disabled class="w-full block text-center text-lg px-6 py-3 font-bold text-slate-500 bg-slate-200 rounded-2xl cursor-not-allowed">
+                                مكتملة العدد
+                            </button>
+                        @endif
                     @endif
                 </div>
             </div>
@@ -214,4 +297,27 @@
         </div>
     </section>
 
+    {{-- Lightbox Modal --}}
+    <div x-show="showGallery" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0">
+        
+        <button @click="showGallery = false" class="absolute top-6 right-6 text-white hover:text-zatara-gold transition-colors z-50">
+            <span class="material-symbols-outlined text-4xl">close</span>
+        </button>
+
+        <div class="w-full h-full p-12 overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto mt-10">
+                @foreach($mediaList as $media)
+                    <div class="rounded-2xl overflow-hidden shadow-2xl">
+                        <img src="{{ $media->getUrl() }}" class="w-full h-auto object-cover hover:scale-105 transition-transform duration-500" alt="Trip Image">
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
 </div>

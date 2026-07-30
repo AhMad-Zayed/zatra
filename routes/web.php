@@ -35,8 +35,8 @@ Route::prefix('{tenant:slug}')->middleware(['tenant.customer'])->group(function 
     Route::get('/auth/{provider}', [\App\Http\Controllers\Auth\SocialAuthController::class, 'redirect'])->name('social.redirect');
     Route::get('/auth/{provider}/callback', [\App\Http\Controllers\Auth\SocialAuthController::class, 'callback'])->name('social.callback');
     
-    // 2. Trip Details Page
-    Route::get('/trip/{tripInstance}', \App\Livewire\TripDetails::class)
+    // 2. Trip Details Page (Using TripTemplate slug)
+    Route::get('/trip/{tripTemplate:slug}', \App\Livewire\TripDetails::class)
         ->name('storefront.trip.details')
         ->scopeBindings();
         
@@ -59,7 +59,7 @@ Route::prefix('{tenant:slug}')->middleware(['tenant.customer'])->group(function 
 
 // --- SECURE B2B FILAMENT ROUTES ---
 Route::middleware(['web', 'auth'])->get('/admin/secure-media/{media}', function (\Spatie\MediaLibrary\MediaCollections\Models\Media $media) {
-    if ($media->collection_name !== 'identity_documents') {
+    if ($media->collection_name !== 'identity_documents' && $media->collection_name !== 'passport' && $media->collection_name !== 'national_id') {
         abort(403, 'Unauthorized media access.');
     }
     
@@ -75,7 +75,7 @@ Route::middleware(['web', 'auth'])->get('/admin/secure-media/{media}', function 
         abort(403, 'Unauthorized access to cross-tenant data. This attempt has been logged.');
     }
 
-    return response()->file($media->getPath());
+    return response()->download($media->getPath());
 })->name('secure.media.download');
 
 // --- WAITING LIST ROUTES ---
@@ -103,6 +103,11 @@ Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
         ->firstOrFail();
         
     \Illuminate\Support\Facades\Auth::guard('customer')->login($customer);
+    
+    if ($customer->tenant_id != $tenantId) {
+        \Illuminate\Support\Facades\Auth::guard('customer')->logout();
+        abort(403, 'Tenant mismatch. This attempt has been logged.');
+    }
     
     // Redirect to customer dashboard or home
     return redirect('/'); // Adjust this if there's a specific customer dashboard
