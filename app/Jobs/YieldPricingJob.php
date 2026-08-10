@@ -46,10 +46,11 @@ class YieldPricingJob implements ShouldQueue
                 // Apply 15% increase to base price. We calculate 15% of the cheapest tier to use as a flat override amount, or just set it to a fixed amount.
                 $cheapestTier = \App\Models\TripPassengerCategory::where('trip_instance_id', $trip->id)->min('price');
                 if ($cheapestTier) {
-                    $increase = $cheapestTier * 0.15;
+                    $increase = (int) round($cheapestTier * 0.15);
+                    // P1.3 FIX: price_override_amount must be the FULL new price, not just the delta
                     $trip->update([
                         'price_override' => true,
-                        'price_override_amount' => $increase,
+                        'price_override_amount' => $cheapestTier + $increase,
                     ]);
                     $processed++;
                 }

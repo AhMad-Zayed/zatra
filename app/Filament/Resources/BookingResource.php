@@ -433,7 +433,7 @@ class BookingResource extends Resource
                                         }
 
                                         $packageAdj = \App\Models\PackageOption::find($get('package_option_id'))?->price_adjustment ?? 0;
-                                        $total += $packageAdj;
+                                        $total += $packageAdj / 100;
 
                                         return '$' . number_format($total, 2);
                                     }),
@@ -505,6 +505,10 @@ class BookingResource extends Resource
                 Tables\Columns\TextColumn::make('tripInstance.tripTemplate.title')
                     ->label('الرحلة')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('booking_status')
+                    ->label('حالة الحجز')
+                    ->badge()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('حالة الدفع')
                     ->badge()
@@ -563,7 +567,16 @@ class BookingResource extends Resource
                             );
                     }),
             ])
+            ->groups([
+                \Filament\Tables\Grouping\Group::make('tripInstance.tripTemplate.title')
+                    ->label('الرحلة')
+                    ->collapsible(),
+            ])
+            ->defaultGroup('tripInstance.tripTemplate.title')
             ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\ActionGroup::make([
                 // ──────────────────────────────────────────────────────────────
                 // إضافة مقاعد لحجز موجود — "سارة بدها تضيف 5 أشخاص"
                 // ──────────────────────────────────────────────────────────────
@@ -572,7 +585,7 @@ class BookingResource extends Resource
                     ->icon('heroicon-o-plus-circle')
                     ->color('primary')
                     ->visible(fn (Booking $record) =>
-                        !in_array($record->booking_status, [\App\Enums\BookingStatus::Cancelled, \App\Enums\BookingStatus::Completed])
+                        !in_array($record->booking_status, [\App\Enums\BookingStatus::Cancelled])
                     )
                     ->modalHeading(fn (Booking $record) =>
                         "إضافة مقاعد — {$record->pnr} ({$record->customer?->name})"
@@ -702,13 +715,8 @@ class BookingResource extends Resource
                                 'expires_at'       => null,
                             ]);
 
-                            // 3. Update booking financial totals only (snapshots are immutable)
-                            \Illuminate\Support\Facades\DB::table('bookings')
-                                ->where('id', $record->id)
-                                ->update([
-                                    'grand_total' => (int) ($newGrandTotal * 100),
-                                    'balance_due' => (int) ($newBalanceDue * 100),
-                                ]);
+                            // 3. Update booking financial totals
+                            app(\App\Services\BookingService::class)->recalculateFinancialStatus($record);
                         });
 
                         \Filament\Notifications\Notification::make()
@@ -793,7 +801,7 @@ class BookingResource extends Resource
                                 'trip_instance_id' => $record->trip_instance_id,
                                 'booking_id'       => $record->id,
                                 'quantity'         => +$count,
-                                'type'             => 'cancellation',
+                                'type'             => 'cancelled',
                                 'expires_at'       => null,
                             ]);
 
@@ -1026,7 +1034,7 @@ class BookingResource extends Resource
                                     'trip_instance_id' => $record->trip_instance_id,
                                     'booking_id'       => $record->id,
                                     'quantity'         => $count, // positive = returning seats
-                                    'type'             => 'cancellation',
+                                    'type'             => 'cancelled',
                                     'expires_at'       => null,
                                 ]);
                             }
@@ -1064,7 +1072,7 @@ class BookingResource extends Resource
                     ->modalHeading('تحويل الحجز إلى رحلة أخرى')
                     ->modalDescription('سيتم نقل جميع الركاب للرحلة الجديدة، وإعادة حساب المبلغ الكلي بناءً على الفئات المختارة.')
                     ->visible(fn (Booking $record) =>
-                        !in_array($record->booking_status, [\App\Enums\BookingStatus::Cancelled, \App\Enums\BookingStatus::Completed])
+                        !in_array($record->booking_status, [\App\Enums\BookingStatus::Cancelled])
                     )
                     ->form([
                         Forms\Components\Select::make('new_trip_instance_id')
@@ -1145,7 +1153,7 @@ class BookingResource extends Resource
                                 'trip_instance_id' => $oldTripId,
                                 'booking_id'       => $record->id,
                                 'quantity'         => $count, // positive = return
-                                'type'             => 'cancellation', // transferring out
+                                'type'             => 'cancelled', // transferring out
                                 'expires_at'       => null,
                             ]);
 
@@ -1195,10 +1203,7 @@ class BookingResource extends Resource
                             ->success()
                             ->send();
                     }),
-
-                Tables\Actions\ViewAction::make(),
-
-                Tables\Actions\EditAction::make(),
+                ])->label('المزيد')->icon('heroicon-m-ellipsis-vertical')->color('gray'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

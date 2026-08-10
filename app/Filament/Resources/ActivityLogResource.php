@@ -24,6 +24,8 @@ class ActivityLogResource extends Resource
     protected static ?string $navigationLabel = 'سجلات التدقيق';
     
     protected static ?string $pluralLabel = 'سجلات التدقيق';
+    protected static ?string $modelLabel = 'سجل النشاط';
+    protected static ?string $pluralModelLabel = 'سجلات النشاط';
 
     // CRIT-008: Restrict audit log access to admin and accountant only
     // Previously had no role guard despite opting out of tenant scoping

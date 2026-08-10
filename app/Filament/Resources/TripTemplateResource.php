@@ -49,7 +49,7 @@ class TripTemplateResource extends Resource
                             ->label('نشط')
                             ->default(true),
                         Forms\Components\Select::make('currency')
-                            ->label('العملة (Currency)')
+                            ->label('العملة')
                             ->options([
                                 'USD' => 'دولار (USD)',
                                 'ILS' => 'شيكل (ILS)',
@@ -83,12 +83,12 @@ class TripTemplateResource extends Resource
                             ->columnSpanFull(),
                     ])->columns(2),
 
-                Forms\Components\Section::make('الوسائط والصور (Media)')
+                Forms\Components\Section::make('الوسائط والصور')
                     ->description('أضف صورة الغلاف الأساسية ومعرض الصور الذي سيظهر للزبون.')
                     ->schema([
                         Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
                             ->collection('cover')
-                            ->label('صورة الغلاف (Cover)')
+                            ->label('صورة الغلاف')
                             ->image()
                             ->imageEditor()
                             ->required()
@@ -96,7 +96,7 @@ class TripTemplateResource extends Resource
                         
                         Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
                             ->collection('gallery')
-                            ->label('معرض الصور (Gallery)')
+                            ->label('معرض الصور')
                             ->image()
                             ->multiple()
                             ->imageEditor()
@@ -104,7 +104,7 @@ class TripTemplateResource extends Resource
                             ->columnSpanFull(),
                     ]),
 
-                Forms\Components\Section::make('فئات التسعير (Pricing Tiers)')
+                Forms\Components\Section::make('فئات التسعير')
                     ->description('تحديد أسعار مختلفة بناءً على الفئة (بالغ، طفل، إلخ). سيتم نسخها لأي موعد جديد.')
                     ->schema([
                         Forms\Components\Repeater::make('templatePassengerCategories')
@@ -159,7 +159,7 @@ class TripTemplateResource extends Resource
                             ->addActionLabel('إضافة فئة تسعير'),
                     ]),
 
-                Forms\Components\Section::make('الإضافات الاختيارية (Add-ons)')
+                Forms\Components\Section::make('الإضافات الاختيارية')
                     ->description('خدمات إضافية يمكن للعميل اختيارها (مثل: غرفة مفردة، مواصلات).')
                     ->schema([
                         Forms\Components\Repeater::make('templateAddons')
@@ -212,7 +212,7 @@ class TripTemplateResource extends Resource
                             ->addActionLabel('إضافة خدمة'),
                     ]),
 
-                Forms\Components\Section::make('متطلبات المسافرين (Dynamic Form)')
+                Forms\Components\Section::make('متطلبات المسافرين')
                     ->description('بناء النموذج الذي سيراه العميل لكل مسافر (مثل طلب صورة الجواز، رقم الهوية). يمكنك اختيار قالب جاهز بدلاً من الإدخال اليدوي.')
                     ->schema([
                         Forms\Components\Select::make('requirement_preset_id')

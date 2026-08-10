@@ -90,7 +90,7 @@ class TripInstanceResource extends Resource
                                 }
                             }),
                         Forms\Components\Select::make('currency')
-                            ->label('العملة (Currency)')
+                            ->label('العملة')
                             ->options([
                                 'USD' => 'دولار (USD)',
                                 'ILS' => 'شيكل (ILS)',
@@ -170,7 +170,7 @@ class TripInstanceResource extends Resource
                     ]),
 
                 Forms\Components\Section::make('الإضافات والمخزون الخاص بهذا الموعد')
-                    ->description('تم نسخ الإضافات من القالب، قم بتحديد السعة القصوى المتاحة (Inventory) لهذا الموعد لتجنب الحجوزات الزائدة.')
+                    ->description('تم نسخ الإضافات من القالب، قم بتحديد السعة القصوى المتاحة لهذا الموعد لتجنب الحجوزات الزائدة.')
                     ->schema([
                         Forms\Components\Repeater::make('tripAddons')
                             ->relationship()

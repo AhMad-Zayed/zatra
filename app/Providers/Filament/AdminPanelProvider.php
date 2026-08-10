@@ -42,6 +42,14 @@ class AdminPanelProvider extends PanelProvider
             ->pages([
                 Pages\Dashboard::class,
             ])
+            ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make('لوحة القيادة')->icon('heroicon-o-home')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('العمليات اليومية')->icon('heroicon-o-bolt')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('إدارة الرحلات')->icon('heroicon-o-map')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('الحجوزات والعملاء')->icon('heroicon-o-ticket')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('المالية')->icon('heroicon-o-banknotes')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('الإعدادات والإدارة')->icon('heroicon-o-cog')->collapsible(false),
+            ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 \App\Filament\Widgets\DashboardStatsOverview::class,

@@ -33,6 +33,7 @@ class DashboardStatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $tenantId = Filament::getTenant()?->id ?? auth()->user()->tenant_id;
+        $currency = auth()->user()->currentTenant?->default_currency ?? 'USD';
 
         // 1. Bookings Today (from merged BookingStatsWidget)
         $bookingsToday = Booking::where('tenant_id', $tenantId)
@@ -81,12 +82,12 @@ class DashboardStatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-calendar-days')
                 ->color('primary'),
 
-            Stat::make('إجمالي الإيرادات', $formattedRevenue . ' SAR')
+            Stat::make('إجمالي الإيرادات', $formattedRevenue . ' ' . $currency)
                 ->description('إجمالي المبالغ المستلمة فعلياً')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
 
-            Stat::make('الأرصدة المعلقة', $formattedOutstanding . ' SAR')
+            Stat::make('الأرصدة المعلقة', $formattedOutstanding . ' ' . $currency)
                 ->description('مبالغ قيد الانتظار أو الدفع النقدي المتأخر')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('danger'),

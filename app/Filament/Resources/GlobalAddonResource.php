@@ -19,7 +19,7 @@ class GlobalAddonResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-puzzle-piece';
     
-    protected static ?string $navigationGroup = 'القواميس والإعدادات';
+    protected static ?string $navigationGroup = 'الإعدادات والإدارة';
 
     public static function canAccess(): bool
     {

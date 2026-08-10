@@ -20,7 +20,7 @@ class WaitingListResource extends Resource
     protected static ?string $navigationLabel = 'قوائم الانتظار';
     protected static ?string $pluralModelLabel = 'طلبات الانتظار';
     protected static ?string $modelLabel = 'طلب انتظار';
-    protected static ?string $navigationGroup = 'الرحلات والحجوزات';
+    protected static ?string $navigationGroup = 'الحجوزات والعملاء';
     protected static ?int $navigationSort = 4;
 
     public static function form(Form $form): Form
@@ -94,7 +94,7 @@ class WaitingListResource extends Resource
                 Tables\Columns\TextColumn::make('phone_number')
                     ->label('رقم الهاتف')
                     ->searchable(),
-                Tables\Columns\BadgeColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->badge()
                     ->label('الحالة')
                     ->formatStateUsing(fn ($state) => match ($state?->value ?? $state) {
                         'pending' => 'في الانتظار',

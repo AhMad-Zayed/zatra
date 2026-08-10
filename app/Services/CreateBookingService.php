@@ -210,7 +210,7 @@ class CreateBookingService
                     ]);
                 }
                 
-                $totalAmount += ($tier->price + $overrideAmount);
+                $totalAmount += $finalPrice;
             }
 
 

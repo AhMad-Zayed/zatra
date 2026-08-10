@@ -10,9 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class Booking extends Model
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+
+class Booking extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'tenant_id',
@@ -41,6 +44,10 @@ class Booking extends Model
         'snapshot_discounts',
         'snapshot_passenger_rules',
         'discount_amount',
+        'balance_due',
+        'cancelled_reason',
+        'cancellation_requested_at',
+        'review_requested',
     ];
 
     protected $casts = [

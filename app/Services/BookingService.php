@@ -54,19 +54,15 @@ class BookingService
                 'pnr' => $reference,
                 'booking_status' => BookingStatus::Pending,
                 'grand_total' => $totalAmount,
-                'flight_details' => $additionalData['flight_details'] ?? null,
-                'hotel_details' => $additionalData['hotel_details'] ?? null,
-                'insurance_details' => $additionalData['insurance_details'] ?? null,
-                'visa_details' => $additionalData['visa_details'] ?? null,
             ]);
 
             // 4. Create passengers
             foreach ($passengersData as $px) {
                 $passenger = $booking->passengers()->create([
                     'tenant_id' => $instance->tenant_id,
-                    'first_name' => $px['name'],
-                    'document_number' => $px['passport_number'],
-                    'special_requirements' => $px['special_requirements'] ?? null,
+                    'first_name' => $px['name'] ?? $px['first_name'] ?? null,
+                    'last_name' => $px['last_name'] ?? null,
+                    'document_number' => $px['passport_number'] ?? $px['document_number'] ?? null,
                 ]);
 
                 // 5. Upload passenger documents via Spatie MediaLibrary
@@ -108,7 +104,7 @@ class BookingService
     public function cancelBooking(Booking $booking, ?string $reason = null): void
     {
         DB::transaction(function () use ($booking, $reason) {
-            $oldStatus = $booking->status;
+            $oldStatus = $booking->booking_status;
             
             // Bypass observers
             DB::table('bookings')

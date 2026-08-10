@@ -26,7 +26,7 @@
                         </div>
                         <div class="text-left">
                             <p class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">المبلغ الإجمالي</p>
-                            <p class="text-2xl font-bold text-zatara-gold">{{ number_format($booking->grand_total, 2) }} SAR</p>
+                            <p class="text-2xl font-bold text-zatara-gold">{{ number_format($booking->grand_total, 2) }} {{ $booking->currency ?? 'USD' }}</p>
                         </div>
                     </div>
 
@@ -41,6 +41,7 @@
                             <div>
                                 <p class="text-slate-400 mb-1">العودة</p>
                                 <p class="font-bold text-slate-700 flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">flight_land</span> <span dir="ltr">{{ \Carbon\Carbon::parse($booking->tripInstance ? $booking->tripInstance->end_date : $booking->snapshot_end_date)->format('Y-m-d') }}</span></p>
+                            </div>
                             @if($booking->packageOption)
                                 <div class="col-span-2 mt-2 pt-2 border-t border-slate-100">
                                     <p class="text-slate-400 mb-2">باقة الإقامة</p>

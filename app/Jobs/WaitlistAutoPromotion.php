@@ -27,8 +27,10 @@ class WaitlistAutoPromotion implements ShouldQueue
         $tripInstance = \App\Models\TripInstance::find($this->tripInstanceId);
         if (!$tripInstance) return;
 
-        // Find next waitlisted person
-        $nextWaitlist = \App\Models\WaitingList::where('trip_instance_id', $this->tripInstanceId)
+        // P1.2 FIX: Use pivot relationship instead of dropped trip_instance_id column
+        $nextWaitlist = \App\Models\WaitingList::whereHas('tripInstances', function ($q) {
+                $q->where('trip_instances.id', $this->tripInstanceId);
+            })
             ->where('status', \App\Enums\WaitingListStatusEnum::Pending)
             ->orderBy('created_at', 'asc')
             ->first();
@@ -58,13 +60,13 @@ class WaitlistAutoPromotion implements ShouldQueue
             \App\Jobs\ReleaseWaitlistHold::dispatch($hold->id, $nextWaitlist->id)
                 ->delay(now()->addHours(2));
 
-            // Notify customer
+            // P1.2 FIX: Use actual columns customer_name and phone_number
             $nextWaitlist->update(['status' => \App\Enums\WaitingListStatusEnum::Notified]);
-            \Illuminate\Support\Facades\Log::info("WhatsApp: Hey {$nextWaitlist->customer->name}, seats opened up! You have 2 hours to book.");
+            \Illuminate\Support\Facades\Log::info("WhatsApp: Hey {$nextWaitlist->customer_name}, seats opened up! You have 2 hours to book.");
             
             \App\Models\NotificationLog::create([
                 'type' => 'WaitlistPromotion',
-                'recipient_contact' => $nextWaitlist->customer->phone,
+                'recipient_contact' => $nextWaitlist->phone_number,
                 'related_id' => $nextWaitlist->id,
             ]);
 

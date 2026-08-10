@@ -15,6 +15,8 @@ class StorefrontCatalog extends Component
     use WithPagination;
 
     public Tenant $tenant;
+    public string $searchDestination = '';
+    public string $searchDate = '';
 
     public function mount(Tenant $tenant)
     {
@@ -28,6 +30,8 @@ class StorefrontCatalog extends Component
             ->whereHas('tripInstances', function ($query) {
                 $query->bookable();
             })
+            ->when($this->searchDestination, fn($q) => $q->whereHas('tripTemplate', fn($tq) => $tq->where('title', 'like', '%'.$this->searchDestination.'%')))
+            ->when($this->searchDate, fn($q) => $q->whereDate('start_date', '>=', $this->searchDate))
             ->with(['tripInstances' => function ($query) {
                 $query->bookable()->orderBy('start_date', 'asc');
             }, 'media'])
