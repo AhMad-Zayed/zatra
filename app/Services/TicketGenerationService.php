@@ -17,7 +17,7 @@ class TicketGenerationService
         // 1. Generate the Verification QR Code (SVG format string)
         $qrCodeSvg = QrCode::size(120)
             ->style('round')
-            ->generate($booking->pnr_code ?? $booking->id);
+            ->generate($booking->pnr ?? $booking->id);
 
         // 2. Aggregate View Data
         $data = [

@@ -18,9 +18,11 @@ class TripBuilderResource extends Resource
     protected static ?string $model = \App\Models\TripTemplate::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-sparkles';
+    
+    // Hide this from navigation as we are using the new split resources
+    protected static bool $shouldRegisterNavigation = false;
+
     // CRIT-006: Fixed English navigation group to Arabic
-    protected static ?string $navigationGroup = 'الرحلات';
-    protected static ?int $navigationSort = 2;
 
     public static function getNavigationLabel(): string
     {

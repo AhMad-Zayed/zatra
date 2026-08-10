@@ -222,6 +222,15 @@ class TripInstancesRelationManager extends RelationManager
                     ->label('المقاعد المتاحة')
                     ->numeric()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('remaining_seats')
+                    ->label('المقاعد المتبقية')
+                    ->badge()
+                    ->color(fn ($state): string => match (true) {
+                        $state <= 0 => 'danger',
+                        $state <= 5 => 'warning',
+                        default => 'success',
+                    })
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('الحالة')
                     ->badge()
@@ -301,6 +310,7 @@ class TripInstancesRelationManager extends RelationManager
                                         'tenant_id' => $ownerRecord->tenant_id,
                                         'name' => $tier->name,
                                         'price' => $tier->price,
+                                        'requires_seat' => $tier->requires_seat,
                                     ]);
                                 }
 

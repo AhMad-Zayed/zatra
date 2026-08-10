@@ -44,7 +44,7 @@ class MyBookings extends Component
         // Optional: Dispatch a notification to Tenant Admin
         \Filament\Notifications\Notification::make()
             ->title('طلب إلغاء حجز جديد')
-            ->body('العميل ' . Auth::guard('customer')->user()->name . ' طلب إلغاء الحجز PNR: ' . $booking->pnr_code)
+            ->body('العميل ' . Auth::guard('customer')->user()->name . ' طلب إلغاء الحجز PNR: ' . $booking->pnr)
             ->warning()
             ->sendToDatabase(\App\Models\User::where('tenant_id', $this->tenant->id)->get());
     }

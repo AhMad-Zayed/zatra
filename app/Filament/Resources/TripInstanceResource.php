@@ -21,17 +21,17 @@ class TripInstanceResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'الرحلات المجدولة';
+        return 'مواعيد الرحلات المجدولة';
     }
 
     public static function getModelLabel(): string
     {
-        return 'رحلة مجدولة';
+        return 'موعد رحلة';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'الرحلات المجدولة';
+        return 'المواعيد المجدولة';
     }
 
     // Navigation group — matches TripBuilderResource
@@ -57,7 +57,7 @@ class TripInstanceResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('trip_template_id')
                             ->relationship('tripTemplate', 'title')
-                            ->label('قالب الرحلة')
+                            ->label('البرنامج الأساسي (القالب)')
                             ->required()
                             ->searchable()
                             ->preload()
@@ -75,6 +75,7 @@ class TripInstanceResource extends Resource
                                     $tiers = $template->templatePassengerCategories->map(fn ($tier) => [
                                         'name' => $tier->name,
                                         'price' => $tier->price,
+                                        'requires_seat' => $tier->requires_seat,
                                     ])->toArray();
 
                                     $addons = $template->templateAddons->map(fn ($addon) => [
@@ -85,14 +86,25 @@ class TripInstanceResource extends Resource
 
                                     $set('tripPassengerCategories', $tiers);
                                     $set('tripAddons', $addons);
+                                    $set('currency', $template->currency); // Auto inherit currency from template
                                 }
                             }),
+                        Forms\Components\Select::make('currency')
+                            ->label('العملة (Currency)')
+                            ->options([
+                                'USD' => 'دولار (USD)',
+                                'ILS' => 'شيكل (ILS)',
+                            ])
+                            ->required()
+                            ->disabledOn('edit') // Rule: Cannot change currency easily once created
+                            ->helperText('ترث العملة من القالب، ولا يمكن تغييرها لاحقاً إذا كان هناك حجوزات.'),
                         Forms\Components\DatePicker::make('start_date')
                             ->label('تاريخ الذهاب')
                             ->required(),
                         Forms\Components\DatePicker::make('end_date')
                             ->label('تاريخ الإياب')
-                            ->required(),
+                            ->required()
+                            ->afterOrEqual('start_date'),
                         Forms\Components\TextInput::make('available_seats')
                             ->label('المقاعد المتاحة')
                             ->numeric()
@@ -106,6 +118,29 @@ class TripInstanceResource extends Resource
                             ])
                             ->required()
                             ->default('active'),
+                    ])->columns(2),
+                    
+                Forms\Components\Section::make('التسعير الخاص والوسائط')
+                    ->description('تعديل السعر أو إضافة صورة غلاف خاصة بهذا الموعد فقط (اختياري)')
+                    ->schema([
+                        Forms\Components\Toggle::make('price_override')
+                            ->label('تغيير السعر الأساسي لهذا الموعد؟')
+                            ->live()
+                            ->default(false),
+                            
+                        Forms\Components\TextInput::make('price_override_amount')
+                            ->label('السعر الجديد لهذا الموعد')
+                            ->numeric()
+                            ->prefix('$')
+                            ->visible(fn (Forms\Get $get) => $get('price_override')),
+                            
+                        Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                            ->collection('cover')
+                            ->label('صورة الغلاف (لهذا الموعد تحديداً)')
+                            ->image()
+                            ->imageEditor()
+                            ->helperText('اختياري: إذا تركته فارغاً، سيتم الاعتماد على صورة الغلاف المرفقة في البرنامج الأساسي.')
+                            ->columnSpanFull(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('فئات التسعير الخاصة بهذا الموعد')
@@ -125,8 +160,12 @@ class TripInstanceResource extends Resource
                                     ->numeric()
                                     ->required()
                                     ->prefix('$'),
+                                Forms\Components\Toggle::make('requires_seat')
+                                    ->label('يخصم مقعد؟')
+                                    ->default(true)
+                                    ->required(),
                             ])
-                            ->columns(2)
+                            ->columns(3)
                             ->addActionLabel('إضافة فئة تسعير استثنائية'),
                     ]),
 
@@ -161,13 +200,22 @@ class TripInstanceResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('effective_cover_url')
+                    ->label('صورة الغلاف')
+                    ->getStateUsing(fn ($record) => $record->effective_cover_url)
+                    ->circular(),
                 Tables\Columns\TextColumn::make('tripTemplate.title')
-                    ->label('الرحلة')
+                    ->label('البرنامج السياحي')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('start_date')
                     ->label('تاريخ الذهاب')
                     ->date()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('effective_price')
+                    ->label('السعر الفعلي')
+                    ->getStateUsing(fn ($record) => $record->price_override ? $record->price_override_amount : $record->tripTemplate?->base_price)
+                    ->money('USD')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('end_date')
                     ->label('تاريخ الإياب')
@@ -187,6 +235,12 @@ class TripInstanceResource extends Resource
                         $state <= 5  => 'warning',
                         default      => 'success',
                     }),
+                Tables\Columns\TextColumn::make('bookings_count')
+                    ->label('الحجوزات المؤكدة')
+                    ->counts('bookings')
+                    ->badge()
+                    ->color('success')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('الحالة')
                     ->badge()
@@ -234,6 +288,60 @@ class TripInstanceResource extends Resource
                     ->url(fn (TripInstance $record): string => route('trip-instance.manifest', $record))
                     ->openUrlInNewTab(),
                     
+                Tables\Actions\Action::make('copy_guide_link')
+                    ->label('نسخ رابط المرشد')
+                    ->icon('heroicon-o-link')
+                    ->color('info')
+                    ->action(function (TripInstance $record) {
+                        // The action doesn't actually run backend code to copy to clipboard in filament v3 easily,
+                        // so we dispatch a browser event or simply show a modal with the link.
+                    })
+                    ->modalHeading('رابط المرشد السياحي')
+                    ->modalDescription('انسخ هذا الرابط وأرسله للمرشد السياحي عبر الواتساب. لا يحتاج المرشد لتسجيل الدخول.')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('إغلاق')
+                    ->form([
+                        Forms\Components\TextInput::make('guide_url')
+                            ->label('الرابط السري (ينتهي بانتهاء الرحلة)')
+                            ->default(fn (TripInstance $record) => url('/g/' . $record->uuid))
+                            ->disabled() // So they can't edit it, but can copy it
+                            ->extraInputAttributes(['readonly' => true]),
+                    ]),
+                    
+                Tables\Actions\Action::make('add_to_waitlist')
+                    ->label('إضافة لقائمة الانتظار')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('warning')
+                    ->visible(fn (\App\Models\TripInstance $record) => $record->remaining_seats <= 0)
+                    ->form([
+                        Forms\Components\TextInput::make('seats_requested')
+                            ->label('عدد المقاعد')
+                            ->numeric()
+                            ->default(1)
+                            ->minValue(1)
+                            ->required(),
+                        Forms\Components\TextInput::make('customer_name')
+                            ->label('اسم العميل')
+                            ->required(),
+                        Forms\Components\TextInput::make('phone_number')
+                            ->label('رقم الهاتف')
+                            ->tel()
+                            ->required(),
+                    ])
+                    ->action(function (array $data, \App\Models\TripInstance $record) {
+                        $wl = \App\Models\WaitingList::create([
+                            'tenant_id' => $record->tenant_id,
+                            'seats_requested' => $data['seats_requested'],
+                            'customer_name' => $data['customer_name'],
+                            'phone_number' => $data['phone_number'],
+                            'status' => 'pending',
+                        ]);
+                        
+                        $wl->tripInstances()->attach($record->id);
+                        
+                        \Filament\Notifications\Notification::make()->success()->title('تم الإضافة لقائمة الانتظار بنجاح')->send();
+                    }),
+
                 Tables\Actions\Action::make('clone_trip')
                     ->label('نسخ الرحلة')
                     ->icon('heroicon-o-document-duplicate')
@@ -335,8 +443,10 @@ class TripInstanceResource extends Resource
     public static function getRelations(): array
     {
         return [
-            \App\Filament\Resources\TripInstanceResource\RelationManagers\WaitingListsRelationManager::class,
-            \App\Filament\Resources\TripInstanceResource\RelationManagers\PackageOptionsRelationManager::class,
+            RelationManagers\BookingsRelationManager::class,
+            RelationManagers\TripPassengersRelationManager::class,
+            RelationManagers\WaitingListsRelationManager::class,
+            RelationManagers\PackageOptionsRelationManager::class,
         ];
     }
 

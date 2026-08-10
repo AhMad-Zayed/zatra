@@ -17,13 +17,52 @@ class TripInstance extends Model implements HasMedia
     use HasFactory, SoftDeletes, HasTripState, InteractsWithMedia;
 
     protected $fillable = [
+        'uuid',
         'tenant_id',
         'trip_template_id',
         'start_date',
+        'currency',
         'end_date',
         'available_seats',
         'status',
+        'price_override',
+        'price_override_amount',
     ];
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('cover')->singleFile();
+    }
+
+    public function getEffectiveCoverUrlAttribute(): ?string
+    {
+        if ($this->hasMedia('cover')) {
+            return $this->getFirstMediaUrl('cover');
+        }
+        if ($this->tripTemplate && $this->tripTemplate->hasMedia('cover')) {
+            return $this->tripTemplate->getFirstMediaUrl('cover');
+        }
+        return null;
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->uuid)) {
+                $model->uuid = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+
+        static::updating(function ($model) {
+            if ($model->isDirty('currency')) {
+                if ($model->bookings()->exists()) {
+                    throw new \RuntimeException("Currency cannot be changed after bookings have been made.");
+                }
+            }
+        });
+    }
 
     protected $casts = [
         'start_date' => 'date',
@@ -33,6 +72,7 @@ class TripInstance extends Model implements HasMedia
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'price_override_amount' => \App\Casts\MoneyCast::class,
     ];
 
     public function tenant(): BelongsTo
@@ -50,6 +90,11 @@ class TripInstance extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+    public function passengers(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(Passenger::class, Booking::class);
+    }
+
     public function packageOptions(): HasMany
     {
         return $this->hasMany(PackageOption::class)->orderBy('sort_order');
@@ -62,9 +107,10 @@ class TripInstance extends Model implements HasMedia
                     ->orderBy('sort_order');
     }
 
-    public function waitingLists(): HasMany
+    public function waitingLists()
     {
-        return $this->hasMany(WaitingList::class);
+        return $this->belongsToMany(WaitingList::class, 'trip_instance_waiting_list')
+                    ->withTimestamps();
     }
 
     public function pickupRoutes()
@@ -88,14 +134,14 @@ class TripInstance extends Model implements HasMedia
             return PHP_INT_MAX;
         }
 
-        $available = \App\Models\InventoryLedger::where('trip_instance_id', $this->id)
+        $taken = \App\Models\InventoryLedger::where('trip_instance_id', $this->id)
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                   ->orWhere('expires_at', '>', now());
             })
             ->sum('quantity');
 
-        return max(0, $available);
+        return max(0, $this->available_seats + $taken);
     }
 
     public function getPassengerWithAddons()

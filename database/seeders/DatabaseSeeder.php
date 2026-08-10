@@ -156,13 +156,14 @@ class DatabaseSeeder extends Seeder
         ], ['created_at' => now()]);
 
         // 9. Waiting List
-        WaitingList::firstOrCreate([
-            'tenant_id' => $tenant->id, 'trip_instance_id' => $activeTrip->id, 'phone_number' => '0501234567'
+        $waitlist1 = WaitingList::firstOrCreate([
+            'tenant_id' => $tenant->id, 'phone_number' => '0501234567'
         ], ['customer_name' => 'VIP Waiter 1', 'status' => 'pending']);
+        $waitlist1->tripInstances()->syncWithoutDetaching([$activeTrip->id]);
         
-        WaitingList::firstOrCreate([
-            'tenant_id' => $tenant->id, 'trip_instance_id' => $activeTrip->id, 'phone_number' => '0509876543'
+        $waitlist2 = WaitingList::firstOrCreate([
+            'tenant_id' => $tenant->id, 'phone_number' => '0509876543'
         ], ['customer_name' => 'VIP Waiter 2', 'status' => 'pending']);
-
+        $waitlist2->tripInstances()->syncWithoutDetaching([$activeTrip->id]);
     }
 }

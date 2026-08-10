@@ -18,7 +18,7 @@ class ResolveStorefrontTenant
             $firstTenant = Tenant::first();
             if ($firstTenant) {
                 $slug = Str::slug($firstTenant->name);
-                return redirect()->route('storefront.home', ['tenant_slug' => $slug]);
+                return redirect()->route('storefront.catalog', ['tenant_slug' => $slug]);
             }
             abort(404, 'No tenants found.');
         }

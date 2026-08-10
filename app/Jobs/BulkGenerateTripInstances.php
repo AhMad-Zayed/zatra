@@ -67,6 +67,7 @@ class BulkGenerateTripInstances implements ShouldQueue
                     $instance->tripPassengerCategories()->create([
                         'name' => $tier->name,
                         'price' => $tier->price,
+                        'requires_seat' => $tier->requires_seat,
                     ]);
                 }
 

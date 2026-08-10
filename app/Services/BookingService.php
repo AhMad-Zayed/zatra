@@ -51,9 +51,9 @@ class BookingService
                 'tenant_id' => $instance->tenant_id,
                 'user_id' => $customer->id,
                 'trip_instance_id' => $instance->id,
-                'reference' => $reference,
-                'status' => BookingStatus::PENDING,
-                'total_amount' => $totalAmount,
+                'pnr' => $reference,
+                'booking_status' => BookingStatus::Pending,
+                'grand_total' => $totalAmount,
                 'flight_details' => $additionalData['flight_details'] ?? null,
                 'hotel_details' => $additionalData['hotel_details'] ?? null,
                 'insurance_details' => $additionalData['insurance_details'] ?? null,
@@ -64,8 +64,8 @@ class BookingService
             foreach ($passengersData as $px) {
                 $passenger = $booking->passengers()->create([
                     'tenant_id' => $instance->tenant_id,
-                    'name' => $px['name'],
-                    'passport_number' => $px['passport_number'],
+                    'first_name' => $px['name'],
+                    'document_number' => $px['passport_number'],
                     'special_requirements' => $px['special_requirements'] ?? null,
                 ]);
 
@@ -115,6 +115,20 @@ class BookingService
                 ->where('id', $booking->id)
                 ->update(['booking_status' => BookingStatus::Cancelled->value]);
 
+            // Release inventory (seats)
+            $seatsToRelease = \App\Models\Passenger::where('booking_id', $booking->id)
+                ->whereHas('tripPassengerCategory', function($q) {
+                    $q->where('requires_seat', true);
+                })->count();
+
+            if ($seatsToRelease > 0) {
+                \App\Models\InventoryLedger::create([
+                    'trip_instance_id' => $booking->trip_instance_id,
+                    'quantity' => $seatsToRelease,
+                    'type' => 'cancelled',
+                ]);
+            }
+
             activity()
                 ->performedOn($booking)
                 ->causedBy(auth()->user())
@@ -124,6 +138,9 @@ class BookingService
                     'reason' => $reason,
                 ])
                 ->log('booking_cancelled');
+
+            // Dispatch waitlist auto-promotion
+            \App\Jobs\WaitlistAutoPromotion::dispatch($booking->trip_instance_id);
         });
     }
 
@@ -137,12 +154,10 @@ class BookingService
             return;
         }
 
-        $paidCents = (int) $booking->payments()
-            ->where('type', '!=', \App\Enums\PaymentType::Reversal)
-            ->where('type', '!=', \App\Enums\PaymentType::Refund)
-            ->sum('amount');
+        // Reversals and Refunds are NEGATIVE amounts, so they must be summed, not excluded!
+        $paidCents = (int) $booking->payments()->sum('amount');
         
-        $totalCents = (int) round(($booking->grand_total ?? 0) * 100);
+        $totalCents = (int) round(($booking->getRawOriginal('grand_total') ?? 0)); // Raw DB integer
 
         // Derive status
         $newStatus = match (true) {
@@ -185,7 +200,7 @@ class BookingService
     {
         $confirmedCount = Passenger::whereHas('booking', function ($q) use ($instance) {
             $q->where('trip_instance_id', $instance->id)
-              ->where('status', '!=', BookingStatus::CANCELLED->value);
+              ->where('booking_status', '!=', BookingStatus::Cancelled->value);
         })->count();
 
         if (($confirmedCount + $newPassengerCount) > $instance->available_seats) {

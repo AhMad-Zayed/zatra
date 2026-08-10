@@ -48,7 +48,7 @@
         </div>
 
         @if($this->guestSession)
-            <div class="max-w-4xl mx-auto mb-6 bg-orange-100 text-orange-800 p-4 rounded-xl text-center font-bold"
+            <div class="max-w-4xl mx-auto mb-6 bg-orange-100 text-orange-800 p-4 rounded-xl flex items-center justify-between font-bold"
                  x-data="{ 
                      expiresAt: new Date('{{ $this->guestSession->expires_at->toIso8601String() }}').getTime(),
                      now: new Date().getTime(),
@@ -60,7 +60,7 @@
                              this.now = new Date().getTime();
                              this.distance = this.expiresAt - this.now;
                              if (this.distance < 0) {
-                                 window.location.href = '{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripInstance' => $tripInstance->id]) }}?expired=1';
+                                 window.location.href = '{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $tripInstance->tripTemplate->slug]) }}?expired=1';
                              } else {
                                  this.minutes = Math.floor((this.distance % (1000 * 60 * 60)) / (1000 * 60));
                                  this.seconds = Math.floor((this.distance % (1000 * 60)) / 1000);
@@ -68,9 +68,16 @@
                          }, 1000);
                      }
                  }"
+                 @timer-extended.window="expiresAt = new Date($event.detail.newTime).getTime(); distance = expiresAt - now;"
                  x-init="startTimer()">
-                ⏱ مقاعدك محجوزة مؤقتاً لمدة: 
-                <span x-text="minutes"></span>:<span x-text="seconds < 10 ? '0' + seconds : seconds"></span>
+                <div>
+                    ⏱ مقاعدك محجوزة مؤقتاً لمدة: 
+                    <span x-text="minutes"></span>:<span x-text="seconds < 10 ? '0' + seconds : seconds"></span>
+                </div>
+                <button type="button" wire:click="extendTimer" class="px-4 py-1.5 bg-orange-200 hover:bg-orange-300 text-orange-900 rounded-full font-bold text-sm shadow-sm flex items-center gap-2 transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">more_time</span>
+                    تمديد الوقت
+                </button>
             </div>
         @endif
 
@@ -218,6 +225,7 @@
                                     @error("form.passengers.{$index}.document_number") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
 
+                                @if($this->tripInstance->tripPassengerCategories->count() > 0)
                                 <div>
                                     <label class="block text-xs font-bold text-zatara-blue mb-2">نوع المسافر (الباقة)</label>
                                     <select wire:model="form.passengers.{{ $index }}.trip_passenger_category_id"
@@ -229,6 +237,7 @@
                                     </select>
                                     @error("form.passengers.{$index}.trip_passenger_category_id") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
                                 </div>
+                                @endif
                                 
                                 @if($this->availablePickupPoints->count() > 0)
                                     <div>
@@ -270,7 +279,7 @@
 
                 <form wire:submit.prevent="submitAddons" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        @forelse($tripInstance->addons ?? [] as $addon)
+                        @forelse($tripInstance->tripAddons ?? [] as $addon)
                             <label wire:click.prevent="toggleAddon({{ $addon->id }})" class="relative flex flex-col p-6 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-xl hover:-translate-y-1 transition-all duration-300 has-[:checked]:border-zatara-gold has-[:checked]:bg-gradient-to-br has-[:checked]:from-zatara-gold/10 has-[:checked]:to-transparent overflow-hidden group">
                                 <input type="checkbox" 
                                        @if(collect($form->addons)->contains('trip_addon_id', $addon->id)) checked @endif
@@ -356,6 +365,29 @@
                         </div>
                     </div>
                 @endif
+
+                <!-- Order Summary -->
+                <div class="bg-gradient-to-br from-zatara-blue to-zatara-blue/90 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-10 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+                    <div class="absolute bottom-0 left-0 w-48 h-48 bg-zatara-gold/10 rounded-full blur-2xl translate-y-1/3 -translate-x-1/3"></div>
+                    
+                    <h3 class="text-xl font-bold mb-6 flex items-center gap-2 relative z-10">
+                        <span class="material-symbols-outlined">receipt_long</span>
+                        ملخص الحجز
+                    </h3>
+                    
+                    <div class="space-y-4 relative z-10">
+                        <div class="flex justify-between items-center text-white/80 border-b border-white/10 pb-4">
+                            <span>الركاب ({{ count($form->passengers) }})</span>
+                            <span class="font-bold text-white">${{ number_format($this->grandTotal) }}</span>
+                        </div>
+                        
+                        <div class="flex justify-between items-center pt-2">
+                            <span class="text-lg font-bold">الإجمالي المطلوب</span>
+                            <span class="text-3xl font-black text-zatara-gold">${{ number_format($this->grandTotal) }}</span>
+                        </div>
+                    </div>
+                </div>
 
                 <form wire:submit.prevent="submitBooking" class="space-y-8">
                     

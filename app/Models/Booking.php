@@ -21,6 +21,7 @@ class Booking extends Model
         'customer_id',
         'user_id',
         'pnr',
+        'currency',
         'uuid',
         'booking_status',
         'payment_status',
@@ -39,12 +40,14 @@ class Booking extends Model
         'snapshot_taxes',
         'snapshot_discounts',
         'snapshot_passenger_rules',
+        'discount_amount',
     ];
 
     protected $casts = [
         'booking_status' => BookingStatus::class,
         'payment_status' => PaymentStatus::class,
         'grand_total' => \App\Casts\MoneyCast::class,
+        'discount_amount' => \App\Casts\MoneyCast::class,
         'total_paid' => \App\Casts\MoneyCast::class,
         'balance_due' => \App\Casts\MoneyCast::class,
         'deposit_amount' => \App\Casts\MoneyCast::class,

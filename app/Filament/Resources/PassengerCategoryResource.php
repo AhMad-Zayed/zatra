@@ -54,6 +54,11 @@ class PassengerCategoryResource extends Resource
                     ->numeric()
                     ->required()
                     ->prefix('$'),
+                Forms\Components\Toggle::make('requires_seat')
+                    ->label('يحتاج مقعد في الحافلة؟')
+                    ->default(true)
+                    ->helperText('إذا تم إيقاف هذا الخيار، فإن الركاب من هذه الفئة لن يستهلكوا مقعداً من سعة الحافلة (مثل الأطفال الرضع).')
+                    ->required(),
             ]);
     }
 
@@ -62,12 +67,15 @@ class PassengerCategoryResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                    ->label('الاسم')
+                    ->label('اسم الفئة')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('default_price')
                     ->label('السعر الافتراضي')
-                    ->money('USD')
+                    ->money('ILS')
                     ->sortable(),
+                Tables\Columns\IconColumn::make('requires_seat')
+                    ->label('مقعد')
+                    ->boolean(),
             ])
             ->filters([
                 //

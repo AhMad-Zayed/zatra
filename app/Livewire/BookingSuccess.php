@@ -42,7 +42,7 @@ class BookingSuccess extends Component
                         $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
                     }
                 })
-                ->view('pdf.ticket', ['booking' => $booking, 'tripInstance' => $booking->tripInstance])
+                ->view('pdf.ticket-template', ['booking' => $booking, 'tripInstance' => $booking->tripInstance])
                 ->name('Zatara-Ticket-' . $booking->pnr . '.pdf')
                 ->format('a4')
                 ->generatePdfContent();

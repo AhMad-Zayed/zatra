@@ -38,7 +38,7 @@ class CheckoutWizard extends Component
     {
         if ($tripInstance->remaining_seats <= 0) {
             session()->flash('error', 'نأسف، لقد بيعت جميع مقاعد هذه الرحلة بالكامل.');
-            $this->redirect(route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripInstance' => $tripInstance->id]), navigate: true);
+            $this->redirect(route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $tripInstance->tripTemplate->slug]), navigate: true);
             return;
         }
 
@@ -60,7 +60,13 @@ class CheckoutWizard extends Component
             $this->packageOption = \App\Models\PackageOption::find($this->selectedPackageId);
         }
 
-        if (Auth::guard('customer')->check() || session()->has('guest_session_id')) {
+        $guest = $this->guestSession;
+        if ($guest && $guest->expires_at < now()) {
+            session()->forget('guest_session_id');
+            $guest = null;
+        }
+
+        if (Auth::guard('customer')->check() || $guest) {
             $this->currentStep = 2;
         }
     }
@@ -71,8 +77,18 @@ class CheckoutWizard extends Component
             $this->addError('form.passengers', "لا يمكن إضافة أكثر من 10 ركاب في حجز واحد.");
             return;
         }
-        if (count($this->form->passengers) >= $this->tripInstance->remaining_seats) {
-            $this->addError('form.passengers', "لا يمكنك إضافة ركاب إضافيين. المقاعد المتبقية: " . $this->tripInstance->remaining_seats);
+        $seatedPassengers = 0;
+        $categories = $this->tripInstance->tripPassengerCategories->keyBy('id');
+        foreach ($this->form->passengers as $p) {
+            $cat = $categories->get($p['trip_passenger_category_id'] ?? null);
+            // Default to requiring a seat if no category is selected yet
+            if (!$cat || $cat->requires_seat) {
+                $seatedPassengers++;
+            }
+        }
+
+        if ($seatedPassengers >= $this->tripInstance->remaining_seats) {
+            $this->addError('form.passengers', "لا توجد مقاعد كافية. يرجى اختيار فئة راكب لا تحتاج مقعداً (مثل الرضع) للركاب الحاليين قبل إضافة المزيد. المقاعد المتبقية: " . $this->tripInstance->remaining_seats);
             return;
         }
         $this->form->addPassenger();
@@ -96,6 +112,35 @@ class CheckoutWizard extends Component
             return \App\Models\GuestSession::find(session()->get('guest_session_id'));
         }
         return null;
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function getGrandTotalProperty()
+    {
+        $total = 0;
+        $overrideAmount = $this->tripInstance->price_override ? $this->tripInstance->price_override_amount : 0;
+        
+        $categories = $this->tripInstance->tripPassengerCategories->keyBy('id');
+        foreach ($this->form->passengers as $p) {
+            $tierId = $p['trip_passenger_category_id'] ?? null;
+            if ($tierId && isset($categories[$tierId])) {
+                $total += ($categories[$tierId]->price + $overrideAmount);
+            }
+        }
+        
+        $addons = $this->tripInstance->tripAddons->keyBy('id');
+        foreach ($this->form->addons as $a) {
+            $addonId = $a['trip_addon_id'] ?? null;
+            if ($addonId && isset($addons[$addonId])) {
+                $total += ($addons[$addonId]->price * ($a['quantity'] ?? 1));
+            }
+        }
+        
+        if ($this->packageOption) {
+            $total += $this->packageOption->price_adjustment;
+        }
+        
+        return max(0, $total);
     }
 
     public function autoFillPassenger()
@@ -153,6 +198,21 @@ class CheckoutWizard extends Component
         $this->currentStep = 2; // Move to Passenger details
     }
 
+    public function extendTimer()
+    {
+        if ($this->guestSession) {
+            $newExpiry = now()->addMinutes(10);
+            $this->guestSession->update(['expires_at' => $newExpiry]);
+            
+            if ($this->guestSession->hold_id) {
+                \App\Models\InventoryLedger::where('id', $this->guestSession->hold_id)
+                    ->update(['expires_at' => $newExpiry]);
+            }
+
+            $this->dispatch('timer-extended', newTime: $newExpiry->toIso8601String());
+        }
+    }
+
     public function submitPassengers()
     {
         // Must be logged in or have a guest session
@@ -163,6 +223,26 @@ class CheckoutWizard extends Component
 
         $this->form->validateOnly('passengers');
         $this->form->validateOnly('passengers.*.trip_passenger_category_id');
+
+        $seatedPassengers = 0;
+        $categories = $this->tripInstance->tripPassengerCategories->keyBy('id');
+        foreach ($this->form->passengers as $p) {
+            $cat = $categories->get($p['trip_passenger_category_id'] ?? null);
+            if (!$cat || $cat->requires_seat) {
+                $seatedPassengers++;
+            }
+        }
+
+        if ($seatedPassengers > $this->tripInstance->remaining_seats) {
+            $this->addError('form.passengers', "عدد الركاب الذين يحتاجون مقاعد ({$seatedPassengers}) يتجاوز المقاعد المتبقية ({$this->tripInstance->remaining_seats}).");
+            return;
+        }
+
+        // Update hold quantity to match seated passengers
+        if ($this->guestSession && $this->guestSession->hold_id) {
+            \App\Models\InventoryLedger::where('id', $this->guestSession->hold_id)
+                ->update(['quantity' => -$seatedPassengers]);
+        }
 
         $this->currentStep = 3; // Move to Addons (or final submit)
     }

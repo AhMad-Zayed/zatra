@@ -10,7 +10,7 @@ class WaitingList extends Model
 {
     protected $fillable = [
         'tenant_id',
-        'trip_instance_id',
+        'seats_requested',
         'customer_name',
         'phone_number',
         'customer_email',
@@ -28,8 +28,11 @@ class WaitingList extends Model
         return $this->belongsTo(Tenant::class);
     }
 
-    public function tripInstance(): BelongsTo
+    public function tripInstances()
     {
-        return $this->belongsTo(TripInstance::class);
+        return $this->belongsToMany(TripInstance::class, 'trip_instance_waiting_list')
+                    ->withPivot('priority')
+                    ->orderByPivot('priority', 'asc')
+                    ->withTimestamps();
     }
 }

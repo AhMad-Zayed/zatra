@@ -79,4 +79,28 @@ class CreateBooking extends CreateRecord
             $this->halt();
         }
     }
+
+    protected function afterCreate(): void
+    {
+        $booking = $this->record;
+        
+        // Dispatch the job to send the magic link
+        \App\Jobs\SendAtlahubWhatsAppJob::dispatch(
+            $booking->tenant_id,
+            'magic_link',
+            [
+                'phone_number' => $booking->customer->phone,
+                'customer_name' => $booking->customer->name,
+                'custom_attributes' => [
+                    'last_destination' => $booking->tripInstance->tripTemplate->title,
+                    'booking_status' => $booking->booking_status->value,
+                    'total_paid' => $booking->payments->sum('amount')->getAmount() / 100, // assuming MoneyCast logic
+                ],
+                'template_variables' => [
+                    $booking->customer->name,
+                    route('customer.booking.portal', $booking->uuid) // Magic link
+                ]
+            ]
+        );
+    }
 }

@@ -25,9 +25,12 @@ class ProcessWaitingListJob implements ShouldQueue
             return;
         }
 
-        // 2. Pop the oldest pending record (FIFO)
-        $nextInLine = WaitingList::where('trip_instance_id', $this->tripInstance->id)
+        // 2. Pop the oldest pending record (FIFO) that requested seats <= available seats
+        $nextInLine = WaitingList::whereHas('tripInstances', function ($q) {
+                $q->where('trip_instances.id', $this->tripInstance->id);
+            })
             ->where('status', WaitingListStatusEnum::Pending)
+            ->where('seats_requested', '<=', $this->tripInstance->available_seats)
             ->oldest('created_at')
             ->first();
 
@@ -51,15 +54,26 @@ class ProcessWaitingListJob implements ShouldQueue
         // 5. Omni-Channel Routing Logic based on Tenant Settings
         $channelPreference = $this->tripInstance->tenant->settings['waiting_list_channel'] ?? 'both';
 
+        // NOTE: In the future, this notification will include the Magic Link (/b/{uuid}) 
+        // to a temporary Booking so the customer can pay and confirm their seat within 15 minutes.
         if (in_array($channelPreference, ['whatsapp', 'both'])) {
-            // Assume WhatsAppService exists or will exist to handle this
-            if (class_exists(\App\Services\WhatsAppService::class)) {
-                app(\App\Services\WhatsAppService::class)->sendWaitingListAlert(
-                    $nextInLine->phone_number,
-                    $nextInLine->customer_name,
-                    $signedUrl
-                );
-            }
+            \App\Jobs\SendAtlahubWhatsAppJob::dispatch(
+                $this->tripInstance->tenant_id,
+                'waitlist',
+                [
+                    'phone_number' => $nextInLine->customer_phone,
+                    'customer_name' => $nextInLine->customer_name,
+                    'custom_attributes' => [
+                        'waitlist_status' => 'notified',
+                    ],
+                    'template_variables' => [
+                        $nextInLine->customer_name,
+                        $this->tripInstance->tripTemplate->title,
+                        $nextInLine->seats_requested,
+                        $signedUrl
+                    ]
+                ]
+            );
         }
 
         if (in_array($channelPreference, ['email', 'both']) && $nextInLine->customer_email) {

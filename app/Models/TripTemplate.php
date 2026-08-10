@@ -16,12 +16,14 @@ class TripTemplate extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('images');
+        $this->addMediaCollection('cover')->singleFile();
+        $this->addMediaCollection('gallery');
     }
 
     protected $fillable = [
         'tenant_id',
         'title',
+        'currency',
         'slug',
         'is_active',
         'description',
@@ -42,6 +44,19 @@ class TripTemplate extends Model implements HasMedia
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::updating(function ($model) {
+            if ($model->isDirty('currency')) {
+                if ($model->tripInstances()->exists()) {
+                    throw new \RuntimeException("Currency cannot be changed because trip instances already exist.");
+                }
+            }
+        });
+    }
 
     public function tenant(): BelongsTo
     {

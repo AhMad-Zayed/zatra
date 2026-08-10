@@ -17,6 +17,13 @@ class Customer extends Authenticatable
         'email',
         'provider_id',
         'provider_name',
+        'otp_code',
+        'otp_expires_at',
+        'notes',
+    ];
+
+    protected $casts = [
+        'otp_expires_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

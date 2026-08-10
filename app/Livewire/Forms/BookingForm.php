@@ -29,7 +29,7 @@ class BookingForm extends Form
     public function rules()
     {
         return [
-            'phone' => ['required', 'string', 'regex:/^\+?[0-9]{7,15}$/'],
+            'phone' => ['nullable', 'string', 'regex:/^\+?[0-9]{7,15}$/'],
             'otp' => ['nullable', 'string', 'size:6'],
             
             'passengers' => ['required', 'array', 'min:1'],
@@ -39,7 +39,7 @@ class BookingForm extends Form
             'passengers.*.document_number' => ['nullable', 'string'],
             'passengers.*.date_of_birth' => ['nullable', 'date'],
             'passengers.*.trip_passenger_category_id' => [
-                'required',
+                'nullable',
                 'integer',
                 Rule::exists('trip_passenger_categories', 'id')->where(function ($query) {
                     return $query->where('trip_instance_id', $this->trip_instance_id);

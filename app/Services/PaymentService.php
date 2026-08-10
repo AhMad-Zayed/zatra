@@ -13,8 +13,12 @@ class PaymentService
     /**
      * Record a new payment entry
      */
-    public function recordPayment(Booking $booking, float $amount, string $method, User $receivedBy, PaymentType $type = PaymentType::DEPOSIT): Payment
+    public function recordPayment(Booking $booking, float $amount, string $method, User $receivedBy, PaymentType $type = PaymentType::DEPOSIT, ?string $currency = null): Payment
     {
+        if ($currency && $currency !== $booking->currency) {
+            throw new \InvalidArgumentException("Invalid Currency: Payment currency ($currency) must match Booking currency ({$booking->currency})");
+        }
+
         if (!app()->environment('testing')) {
             $key = 'record-payment:' . $booking->id;
             if (\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 3)) {
@@ -29,6 +33,7 @@ class PaymentService
                 'tenant_id' => $booking->tenant_id,
                 'booking_id' => $booking->id,
                 'amount' => $amount,
+                'currency' => $booking->currency,
                 'payment_method' => $method,
                 'received_by' => $receivedBy->id,
                 'type' => $type,
@@ -40,8 +45,9 @@ class PaymentService
                 ->withProperties([
                     'payment_id' => $payment->id,
                     'amount' => $payment->amount,
+                    'currency' => $payment->currency,
                     'type' => $payment->type?->value,
-                    'new_balance' => $booking->fresh()->paid_amount,
+                    'new_balance' => tap($booking->fresh(), fn($b) => app(\App\Services\BookingService::class)->recalculateFinancialStatus($b))->total_paid,
                 ])
                 ->log('payment_recorded');
 
@@ -54,11 +60,17 @@ class PaymentService
      */
     public function reversePayment(Payment $original, string $reason, User $receivedBy): Payment
     {
+        // Refund Limit Validation
+        if ($original->booking->total_paid < $original->amount) {
+            throw new \RuntimeException("Refund Limit Exceeded: Cannot refund more than the net paid amount.");
+        }
+
         return DB::transaction(function () use ($original, $reason, $receivedBy) {
             $reversal = Payment::create([
                 'tenant_id' => $original->tenant_id,
                 'booking_id' => $original->booking_id,
                 'amount' => -$original->amount, // negative entry
+                'currency' => $original->currency,
                 'payment_method' => $original->payment_method,
                 'received_by' => $receivedBy->id,
                 'type' => PaymentType::REVERSAL,
@@ -71,8 +83,9 @@ class PaymentService
                     'original_payment_id' => $original->id,
                     'reversal_payment_id' => $reversal->id,
                     'amount' => $reversal->amount,
+                    'currency' => $reversal->currency,
                     'reason' => $reason,
-                    'new_balance' => $original->booking->fresh()->paid_amount,
+                    'new_balance' => tap($original->booking->fresh(), fn($b) => $b->recalculateFinancials())->total_paid,
                 ])
                 ->log('payment_reversed');
 

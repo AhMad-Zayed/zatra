@@ -18,10 +18,12 @@ class TripPassengerCategory extends Model
         'trip_instance_id',
         'name',
         'price',
+        'requires_seat',
     ];
 
     protected $casts = [
         'price' => \App\Casts\MoneyCast::class,
+        'requires_seat' => 'boolean',
     ];
 
     protected static function booted(): void

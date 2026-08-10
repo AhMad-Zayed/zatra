@@ -36,6 +36,28 @@ class TenantResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Toggle::make('is_active')
                     ->default(true),
+
+                Forms\Components\Section::make('Atlahub (Chatwoot) Integration')
+                    ->description('إعدادات الربط مع منصة أطلس هب للواتساب')
+                    ->schema([
+                        Forms\Components\TextInput::make('settings.atlahub_api_url')
+                            ->label('API URL')
+                            ->url()
+                            ->default('https://chat.atlahub.com')
+                            ->required(),
+                        Forms\Components\TextInput::make('settings.atlahub_account_id')
+                            ->label('Account ID')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('settings.atlahub_inbox_id')
+                            ->label('Inbox ID (WhatsApp)')
+                            ->numeric()
+                            ->required(),
+                        Forms\Components\TextInput::make('settings.atlahub_api_token')
+                            ->label('API Token')
+                            ->password()
+                            ->required(),
+                    ])->columns(2),
             ]);
     }
 

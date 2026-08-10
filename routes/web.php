@@ -112,3 +112,22 @@ Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
     // Redirect to customer dashboard or home
     return redirect('/'); // Adjust this if there's a specific customer dashboard
 })->name('login.magic');
+
+// --- MAGIC LINK / CUSTOMER PORTAL ---
+Route::get('/b/{uuid}', \App\Livewire\CustomerBookingPortal::class)->name('customer.booking.portal');
+
+Route::get('/b/{uuid}/ticket/download', function ($uuid) {
+    $booking = \App\Models\Booking::where('uuid', $uuid)->firstOrFail();
+    
+    // Get latest ticket media
+    $media = $booking->getMedia('tickets')->last();
+    
+    if (!$media) {
+        abort(404, 'التذكرة غير متوفرة بعد.');
+    }
+    
+    return response()->download($media->getPath(), "Ticket_{$booking->pnr}.pdf");
+})->name('customer.ticket.download');
+
+// --- TOUR GUIDE MANIFEST ---
+Route::get('/g/{uuid}', \App\Livewire\TourGuideManifest::class)->name('tour.guide.manifest');

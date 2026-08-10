@@ -41,17 +41,21 @@ class PassengersRelationManager extends RelationManager
                             'national_id' => 'هوية وطنية',
                             'passport'    => 'جواز سفر',
                         ])
-                        ->required(),
+                        ->nullable(),
                     TextInput::make('document_number')
                         ->label('رقم الوثيقة')
-                        ->required()
-                        ->maxLength(255),
+                        ->maxLength(255)
+                        ->nullable(),
                     DatePicker::make('date_of_birth')
                         ->label('تاريخ الميلاد')
                         ->nullable(),
                     Select::make('gender')
                         ->label('الجنس')
                         ->options(['male' => 'ذكر', 'female' => 'أنثى'])
+                        ->nullable(),
+                    TextInput::make('seat_number')
+                        ->label('رقم المقعد')
+                        ->maxLength(255)
                         ->nullable(),
                     Select::make('trip_passenger_category_id')
                         ->label('فئة المسافر (الباقة)')
@@ -92,29 +96,38 @@ class PassengersRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('first_name')
             ->columns([
-                TextColumn::make('first_name')
-                    ->label('الاسم الأول')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('last_name')
-                    ->label('اسم العائلة')
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('display_name')
+                    ->label('اسم الراكب')
+                    ->getStateUsing(fn ($record) => $record->display_name ?? ($record->first_name ? trim($record->first_name . ' ' . $record->last_name) : $record->passenger_label))
+                    ->searchable(['first_name', 'last_name', 'passenger_label'])
+                    ->sortable(['first_name']),
+                
+                TextColumn::make('seat_number')
+                    ->label('رقم المقعد')
+                    ->searchable(),
+
+                IconColumn::make('data_complete')
+                    ->label('البيانات')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-exclamation-triangle')
+                    ->trueColor('success')
+                    ->falseColor('warning')
+                    ->tooltip(fn ($state) => $state ? 'بيانات مكتملة' : 'بيانات ناقصة (حجز سريع)'),
+
                 TextColumn::make('document_type')
                     ->label('نوع الوثيقة')
                     ->formatStateUsing(fn ($state) => match ($state) {
                         'national_id' => 'هوية وطنية',
                         'passport'    => 'جواز سفر',
-                        default       => $state,
+                        default       => $state ?? '—',
                     }),
                 TextColumn::make('document_number')
                     ->label('رقم الوثيقة')
+                    ->placeholder('—')
                     ->searchable(),
                 TextColumn::make('tripPassengerCategory.name')
                     ->label('الفئة')
-                    ->placeholder('—'),
-                TextColumn::make('pickupPoint.name')
-                    ->label('نقطة التجمع')
                     ->placeholder('—'),
             ])
             ->filters([
@@ -125,11 +138,19 @@ class PassengersRelationManager extends RelationManager
                     ->label('إضافة مسافر جديد')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['tenant_id'] = $this->getOwnerRecord()->tenant_id;
+                        $data['data_complete'] = true;
                         return $data;
                     }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()->label('تعديل'),
+                Tables\Actions\EditAction::make()
+                    ->label(fn ($record) => $record->data_complete ? 'تعديل' : 'إكمال البيانات')
+                    ->color(fn ($record) => $record->data_complete ? 'primary' : 'warning')
+                    ->icon(fn ($record) => $record->data_complete ? 'heroicon-o-pencil' : 'heroicon-o-identification')
+                    ->mutateFormDataUsing(function (array $data): array {
+                        $data['data_complete'] = true;
+                        return $data;
+                    }),
                 Tables\Actions\DeleteAction::make()->label('حذف'),
             ])
             ->bulkActions([

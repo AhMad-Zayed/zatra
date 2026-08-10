@@ -25,9 +25,8 @@ class CreatePayment extends CreateRecord
             // Wait, we can just let Laravel increment it if it's cast.
             
             // Re-calculate the total paid from all payments
+            // Note: Reversals and Refunds are saved as NEGATIVE amounts, so they MUST be summed!
             $sumCents = \App\Models\Payment::where('booking_id', $booking->id)
-                ->where('type', '!=', \App\Enums\PaymentType::Reversal)
-                ->where('type', '!=', \App\Enums\PaymentType::Refund)
                 // Use raw SQL sum since MoneyCast will mess up ->sum('amount') 
                 ->sum('amount'); // This sum returns raw cents from DB!
             
@@ -40,7 +39,7 @@ class CreatePayment extends CreateRecord
             ]);
 
             // Auto-confirm if paid in full
-            if ($newBalance <= 0 && $booking->booking_status === \App\Enums\BookingStatus::Pending) {
+            if ($newBalanceFloat <= 0 && $booking->booking_status === \App\Enums\BookingStatus::Pending) {
                 $booking->update(['booking_status' => \App\Enums\BookingStatus::Confirmed]);
             }
         }

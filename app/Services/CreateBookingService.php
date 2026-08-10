@@ -48,7 +48,20 @@ class CreateBookingService
                 ->firstOrFail();
 
             // 2. Check general inventory limits if applicable
-            $requestedSeats = count($passengersData);
+            $requestedSeats = 0;
+            $categories = TripPassengerCategory::where('trip_instance_id', $tripInstanceId)
+                ->whereIn('id', collect($passengersData)->pluck('trip_passenger_category_id')->filter())
+                ->get()
+                ->keyBy('id');
+
+            foreach ($passengersData as $pData) {
+                $catId = $pData['trip_passenger_category_id'] ?? null;
+                $cat = $categories->get($catId);
+                // Default to requiring a seat if no category or if category requires seat
+                if (!$cat || $cat->requires_seat) {
+                    $requestedSeats++;
+                }
+            }
             
             // Check if we are checking out from a guest session hold
             $holdId = $data['hold_id'] ?? null;
@@ -58,29 +71,43 @@ class CreateBookingService
                 $hold = \App\Models\InventoryLedger::find($holdId);
             }
 
-            if ($tripInstance->available_seats !== null && !$hold) {
-                $available = \App\Models\InventoryLedger::where('trip_instance_id', $tripInstanceId)
+            if ($tripInstance->available_seats !== null) {
+                $ledgerSum = \App\Models\InventoryLedger::where('trip_instance_id', $tripInstanceId)
                     ->where(function ($q) {
                         $q->whereNull('expires_at')
                           ->orWhere('expires_at', '>', now());
                     })
                     ->sum('quantity');
 
-                if ($available < $requestedSeats) {
-                    throw new \App\Exceptions\InsufficientSeatsException("Sorry, only " . $available . " seats left.");
+                $remaining = $tripInstance->available_seats + $ledgerSum;
+                
+                // If there's an existing hold, we add back the held quantity to see true remaining capacity
+                // because the hold is already subtracted from ledgerSum
+                $effectiveRemaining = $hold ? ($remaining + abs($hold->quantity)) : $remaining;
+
+                if ($effectiveRemaining < $requestedSeats) {
+                    throw new \App\Exceptions\InsufficientSeatsException("نأسف، المقاعد المتبقية فقط " . max(0, $effectiveRemaining) . " مقاعد.");
                 }
 
-                $hold = \App\Models\InventoryLedger::create([
-                    'trip_instance_id' => $tripInstanceId,
-                    'quantity' => -$requestedSeats,
-                    'type' => 'confirmed',
-                ]);
+                if (!$hold) {
+                    $hold = \App\Models\InventoryLedger::create([
+                        'trip_instance_id' => $tripInstanceId,
+                        'quantity' => -$requestedSeats,
+                        'type' => 'confirmed',
+                    ]);
+                } else {
+                    // Convert the existing hold to a confirmed entry
+                    $hold->update([
+                        'type' => 'confirmed',
+                        'expires_at' => null,
+                        'quantity' => -$requestedSeats // update to final quantity
+                    ]);
+                }
             } else if ($hold) {
-                // Convert the existing hold to a confirmed entry
                 $hold->update([
                     'type' => 'confirmed',
                     'expires_at' => null,
-                    'quantity' => -$requestedSeats // update to final quantity
+                    'quantity' => -$requestedSeats
                 ]);
             }
 
@@ -129,6 +156,7 @@ class CreateBookingService
                 'customer_id' => $customerId, // The actual owner of the booking
                 'user_id' => $creatorUserId, // Audit trail: The Admin who created this (Null for self-checkout)
                 'pnr' => $pnr,
+                'currency' => $tripInstance->currency ?? 'USD', // Inherit currency from TripInstance
                 'booking_status' => $bookingStatus,
                 'payment_status' => PaymentStatus::Unpaid,
                 'payment_type' => $paymentType,
@@ -144,34 +172,47 @@ class CreateBookingService
             }
 
             // 4. Process Passengers
-            foreach ($passengersData as $pData) {
+            // Phone booking mode: passengersData may contain seat-allocation entries without names.
+            // In this case we create placeholder passenger records (data_complete = false).
+            $isPhoneBooking = $data['phone_booking_mode'] ?? false;
+
+            foreach ($passengersData as $index => $pData) {
                 $tier = TripPassengerCategory::where('id', $pData['trip_passenger_category_id'])
                             ->where('trip_instance_id', $tripInstanceId)
                             ->firstOrFail();
-                            
+
+                $humanIndex = $index + 1;
+                $isIncomplete = $isPhoneBooking && empty($pData['first_name']);
+
+                $finalPrice = $tripInstance->price_override ? $overrideAmount : $tier->price;
+
                 $passenger = Passenger::create([
-                    'tenant_id' => $tenantId,
-                    'booking_id' => $booking->id,
+                    'tenant_id'                  => $tenantId,
+                    'booking_id'                 => $booking->id,
                     'trip_passenger_category_id' => $tier->id,
-                    'price_at_booking' => $tier->price + $overrideAmount,
-                    'first_name' => $pData['first_name'] ?? null,
-                    'last_name' => $pData['last_name'] ?? null,
-                    'document_type' => $pData['document_type'] ?? null,
-                    'document_number' => $pData['document_number'] ?? null,
-                    'date_of_birth' => $pData['date_of_birth'] ?? null,
-                    'extra_preferences' => is_array($pData['extra_preferences'] ?? null) ? $pData['extra_preferences'] : [],
+                    'price_at_booking'           => $finalPrice,
+                    'first_name'                 => $pData['first_name'] ?? null,
+                    'last_name'                  => $pData['last_name'] ?? null,
+                    'document_type'              => $pData['document_type'] ?? null,
+                    'document_number'            => $pData['document_number'] ?? null,
+                    'date_of_birth'              => $pData['date_of_birth'] ?? null,
+                    'extra_preferences'          => is_array($pData['extra_preferences'] ?? null) ? $pData['extra_preferences'] : [],
+                    // Phone booking placeholders:
+                    'data_complete'              => !$isIncomplete,
+                    'passenger_label'            => $isIncomplete ? "راكب {$humanIndex} ({$tier->name})" : null,
                 ]);
 
                 if (!empty($pData['pickup_point_id'])) {
                     \App\Models\BookingPickup::create([
-                        'booking_id' => $booking->id,
+                        'booking_id'      => $booking->id,
                         'pickup_point_id' => $pData['pickup_point_id'],
-                        'passenger_id' => $passenger->id,
+                        'passenger_id'    => $passenger->id,
                     ]);
                 }
                 
                 $totalAmount += ($tier->price + $overrideAmount);
             }
+
 
             // 5. Process Addons
             foreach ($addonsData as $aData) {
@@ -214,13 +255,18 @@ class CreateBookingService
                 }
                 
                 $packageAdjustment = $package?->price_adjustment ?? 0;
-                $totalAmount += $packageAdjustment;
+                $totalAmount += ($packageAdjustment * count($passengersData));
             }
+
+            // Apply Discount
+            $discountAmount = $data['discount_amount'] ?? 0;
+            $totalAmount = max(0, $totalAmount - $discountAmount);
 
             // 6. Update Final Totals and Snapshots
             $booking->update([
                 'grand_total' => $totalAmount,
                 'balance_due' => $totalAmount,
+                'discount_amount' => $discountAmount,
                 'snapshot_trip_title' => $tripInstance->tripTemplate?->title ?? 'Unknown Trip',
                 'snapshot_template_name' => $tripInstance->tripTemplate?->title ?? 'Unknown Template',
                 'snapshot_start_date' => $tripInstance->start_date,

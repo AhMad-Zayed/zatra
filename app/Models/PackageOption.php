@@ -41,11 +41,13 @@ class PackageOption extends Model
             return $this->tripInstance->remaining_seats;
         }
 
-        $booked = $this->bookings()
-            ->whereNotIn('booking_status', ['cancelled', 'failed'])
-            ->withCount('passengers')
-            ->get()
-            ->sum('passengers_count');
+        $booked = \App\Models\Passenger::whereIn('booking_id', function($q) {
+            $q->select('id')->from('bookings')
+              ->where('package_option_id', $this->id)
+              ->whereNotIn('booking_status', ['cancelled', 'failed']);
+        })->whereHas('tripPassengerCategory', function($q) {
+            $q->where('requires_seat', true);
+        })->count();
 
         $packageRemaining = max(0, $this->available_seats - $booked);
         

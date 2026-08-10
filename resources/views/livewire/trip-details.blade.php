@@ -59,47 +59,69 @@
 
         {{-- MASONRY GALLERY --}}
         @php
-            $templateMedia = $template->getMedia('trip_images') ?? collect();
-            $mediaList = $templateMedia;
+            $coverMedia = $template->getFirstMedia('cover');
+            $galleryMedia = $template->getMedia('gallery') ?? collect();
+            $mediaList = $coverMedia ? collect([$coverMedia])->merge($galleryMedia) : $galleryMedia;
             
             $mainImg = $mediaList->count() > 0 ? $mediaList[0]->getUrl() : asset('images/placeholder.jpg');
             $img2 = $mediaList->count() > 1 ? $mediaList[1]->getUrl() : null;
             $img3 = $mediaList->count() > 2 ? $mediaList[2]->getUrl() : null;
             $img4 = $mediaList->count() > 3 ? $mediaList[3]->getUrl() : null;
             
-            $hasMultiple = $mediaList->count() > 1;
+            $count = $mediaList->count();
         @endphp
-        <div class="grid grid-cols-4 grid-rows-2 gap-4 h-[60vh] rounded-[2.5rem] overflow-hidden">
-            <div class="{{ $hasMultiple ? 'col-span-4 md:col-span-2 row-span-2' : 'col-span-4 row-span-2' }} relative group">
-                <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
-            </div>
-            @if($hasMultiple)
-            <div class="col-span-2 md:col-span-1 row-span-1 relative group bg-slate-100">
-                @if($img2)
-                    <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
-                @else
-                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
-                @endif
-            </div>
-            <div class="col-span-2 md:col-span-1 row-span-1 relative group bg-slate-100">
-                @if($img3)
-                    <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
-                @else
-                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
-                @endif
-            </div>
-            <div class="col-span-4 md:col-span-2 row-span-1 relative group bg-slate-100">
-                @if($img4)
-                    <img src="{{ $img4 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
-                @else
-                    <div class="w-full h-full flex items-center justify-center"><span class="material-symbols-outlined text-slate-300 text-4xl">image</span></div>
-                @endif
-                {{-- View All Photos Button --}}
-                <button @click="showGallery = true" class="absolute bottom-4 right-4 glass-panel px-6 py-2 rounded-xl font-bold text-zatara-blue hover:bg-white transition-colors flex items-center gap-2">
+        
+        <div class="relative group">
+            @if($count == 0 || $count == 1)
+                <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative">
+                    <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                </div>
+            @elseif($count == 2)
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 h-[60vh] rounded-[2.5rem] overflow-hidden relative">
+                    <div class="relative overflow-hidden group">
+                        <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                    <div class="relative overflow-hidden group bg-slate-100 hidden md:block">
+                        <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                </div>
+            @elseif($count == 3)
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 h-[60vh] rounded-[2.5rem] overflow-hidden relative">
+                    <div class="md:col-span-2 relative overflow-hidden group">
+                        <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                    <div class="hidden md:grid grid-rows-2 gap-4">
+                        <div class="relative overflow-hidden group bg-slate-100">
+                            <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        </div>
+                        <div class="relative overflow-hidden group bg-slate-100">
+                            <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        </div>
+                    </div>
+                </div>
+            @else
+                <div class="grid grid-cols-4 grid-rows-2 gap-4 h-[60vh] rounded-[2.5rem] overflow-hidden">
+                    <div class="col-span-4 md:col-span-2 row-span-2 relative overflow-hidden group">
+                        <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                    <div class="col-span-2 md:col-span-1 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
+                        <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                    <div class="col-span-2 md:col-span-1 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
+                        <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                    <div class="col-span-4 md:col-span-2 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
+                        <img src="{{ $img4 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                    </div>
+                </div>
+            @endif
+
+            {{-- View All Photos Button --}}
+            @if($count > 1)
+                <button @click="showGallery = true" class="absolute bottom-4 right-4 glass-panel px-6 py-2 rounded-xl font-bold text-zatara-blue hover:bg-white transition-colors flex items-center gap-2 shadow-lg">
                     <span class="material-symbols-outlined">photo_library</span>
-                    شاهد جميع الصور
+                    شاهد جميع الصور ({{ $count }})
                 </button>
-            </div>
             @endif
         </div>
     </section>
@@ -253,13 +275,13 @@
                                             <div class="shrink-0 text-right">
                                                 @if($package->price_adjustment > 0)
                                                     <span class="text-zatara-gold font-black text-sm">
-                                                        +{{ number_format($package->price_adjustment / 100) }}$
+                                                        +{{ number_format($package->price_adjustment) }}$
                                                     </span>
                                                 @elseif($package->price_adjustment == 0)
                                                     <span class="text-green-600 font-bold text-xs">مشمول</span>
                                                 @else
                                                     <span class="text-green-600 font-bold text-xs">
-                                                        -{{ number_format(abs($package->price_adjustment) / 100) }}$
+                                                        -{{ number_format(abs($package->price_adjustment)) }}$
                                                     </span>
                                                 @endif
                                             </div>
@@ -272,7 +294,7 @@
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm text-slate-500">السعر النهائي</span>
                                     <span class="text-2xl font-black text-zatara-blue">
-                                        ${{ number_format($this->finalPrice / 100) }}
+                                        ${{ number_format($this->finalPrice) }}
                                     </span>
                                 </div>
                             </div>

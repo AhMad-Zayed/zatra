@@ -16,6 +16,7 @@ class Payment extends Model
         'tenant_id',
         'booking_id',
         'amount',
+        'currency',
         'payment_method',
         'reference_number',
         'type',

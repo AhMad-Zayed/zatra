@@ -84,11 +84,11 @@ class PortalController extends Controller
             $customer = $this->authService->findOrCreateByPhone($request->phone, null, $tenant->id);
             
             // Log in the user
-            Auth::login($customer);
+            Auth::guard('customer')->login($customer);
 
             return response()->json([
                 'success' => true,
-                'redirect_url' => route('portal.dashboard', ['tenant_slug' => \Illuminate\Support\Str::slug($tenant->name)]),
+                'redirect_url' => route('portal.dashboard', ['tenant' => \Illuminate\Support\Str::slug($tenant->name)]),
             ]);
         }
 
@@ -108,7 +108,7 @@ class PortalController extends Controller
         $user = Auth::user();
 
         // Get bookings belonging to this customer and scoped to the active tenant
-        $bookings = Booking::where('user_id', $user->id)
+        $bookings = Booking::where('customer_id', $user->id)
             ->where('tenant_id', $tenant->id)
             ->with(['tripInstance.tripTemplate', 'passengers'])
             ->latest()
@@ -124,6 +124,6 @@ class PortalController extends Controller
         $request->session()->regenerateToken();
 
         $tenant = app(Tenant::class);
-        return redirect()->route('portal.login', ['tenant_slug' => \Illuminate\Support\Str::slug($tenant->name)]);
+        return redirect()->route('portal.login', ['tenant' => \Illuminate\Support\Str::slug($tenant->name)]);
     }
 }

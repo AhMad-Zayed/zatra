@@ -17,22 +17,22 @@ class TripTemplateResource extends Resource
 {
     protected static ?string $model = TripTemplate::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
-
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?string $navigationGroup = 'إدارة الرحلات';
+    protected static ?int $navigationSort = 1;
 
     public static function getNavigationLabel(): string
     {
-        return 'قوالب الرحلات';
+        return 'دليل البرامج السياحية';
     }
 
     public static function getModelLabel(): string
     {
-        return 'قالب رحلة';
+        return 'برنامج سياحي';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'قوالب الرحلات';
+        return 'البرامج السياحية';
     }
 
     public static function form(Form $form): Form
@@ -42,12 +42,22 @@ class TripTemplateResource extends Resource
                 Forms\Components\Section::make('المعلومات الأساسية')
                     ->schema([
                         Forms\Components\TextInput::make('title')
-                            ->label('اسم القالب / الرحلة')
+                            ->label('اسم البرنامج السياحي')
                             ->required()
                             ->maxLength(255),
                         Forms\Components\Toggle::make('is_active')
-                            ->label('فعال')
+                            ->label('نشط')
                             ->default(true),
+                        Forms\Components\Select::make('currency')
+                            ->label('العملة (Currency)')
+                            ->options([
+                                'USD' => 'دولار (USD)',
+                                'ILS' => 'شيكل (ILS)',
+                            ])
+                            ->default('USD')
+                            ->required()
+                            ->disabledOn('edit') // Rule: Cannot change currency easily once created
+                            ->helperText('عملة الرحلة الأساسية. لا يمكن تغييرها لاحقاً إذا كان هناك حجوزات.'),
                         Forms\Components\TextInput::make('base_price')
                             ->label('السعر الأساسي (الافتراضي)')
                             ->numeric()
@@ -73,6 +83,27 @@ class TripTemplateResource extends Resource
                             ->columnSpanFull(),
                     ])->columns(2),
 
+                Forms\Components\Section::make('الوسائط والصور (Media)')
+                    ->description('أضف صورة الغلاف الأساسية ومعرض الصور الذي سيظهر للزبون.')
+                    ->schema([
+                        Forms\Components\SpatieMediaLibraryFileUpload::make('cover')
+                            ->collection('cover')
+                            ->label('صورة الغلاف (Cover)')
+                            ->image()
+                            ->imageEditor()
+                            ->required()
+                            ->columnSpanFull(),
+                        
+                        Forms\Components\SpatieMediaLibraryFileUpload::make('gallery')
+                            ->collection('gallery')
+                            ->label('معرض الصور (Gallery)')
+                            ->image()
+                            ->multiple()
+                            ->imageEditor()
+                            ->panelLayout('grid')
+                            ->columnSpanFull(),
+                    ]),
+
                 Forms\Components\Section::make('فئات التسعير (Pricing Tiers)')
                     ->description('تحديد أسعار مختلفة بناءً على الفئة (بالغ، طفل، إلخ). سيتم نسخها لأي موعد جديد.')
                     ->schema([
@@ -81,7 +112,7 @@ class TripTemplateResource extends Resource
                             ->minItems(1)
                             ->label('الفئات')
                             ->schema([
-                                Forms\Components\Select::make('global_pricing_tier_id')
+                                Forms\Components\Select::make('passenger_category_id')
                                     ->label('استيراد من المكتبة')
                                     ->relationship('passengerCategory', 'name')
                                     ->searchable()
@@ -104,6 +135,7 @@ class TripTemplateResource extends Resource
                                             if ($global) {
                                                 $set('name', $global->name);
                                                 $set('price', $global->default_price);
+                                                $set('requires_seat', $global->requires_seat);
                                             }
                                         }
                                     })
@@ -117,6 +149,10 @@ class TripTemplateResource extends Resource
                                     ->numeric()
                                     ->required()
                                     ->prefix('$'),
+                                Forms\Components\Toggle::make('requires_seat')
+                                    ->label('يخصم مقعد؟')
+                                    ->default(true)
+                                    ->required(),
                             ])
                             ->columns(2)
                             ->defaultItems(1)
@@ -223,8 +259,12 @@ class TripTemplateResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\SpatieMediaLibraryImageColumn::make('cover')
+                    ->collection('cover')
+                    ->label('صورة الغلاف')
+                    ->circular(),
                 Tables\Columns\TextColumn::make('title')
-                    ->label('اسم القالب')
+                    ->label('اسم البرنامج السياحي')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('base_price')

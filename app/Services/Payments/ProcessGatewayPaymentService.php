@@ -25,7 +25,7 @@ class ProcessGatewayPaymentService
                 ->firstOrFail();
 
             // 2. Idempotency Check: Prevent double-crediting
-            if (Payment::where('transaction_id', $paymentData['transaction_id'])->exists()) {
+            if (Payment::where('reference_number', $paymentData['transaction_id'])->exists()) {
                 // Return null to signify an idempotent skip
                 return null;
             }
@@ -34,14 +34,13 @@ class ProcessGatewayPaymentService
             $payment = Payment::create([
                 'tenant_id' => $paymentData['tenant_id'],
                 'booking_id' => $booking->id,
-                'transaction_id' => $paymentData['transaction_id'],
+                'reference_number' => $paymentData['transaction_id'],
                 'amount' => $paymentData['amount'],
-                'method' => $paymentData['method'],
-                'status' => 'Completed',
+                'payment_method' => $paymentData['method'],
             ]);
 
             // 4. Calculate Financial Totals
-            $totalPaidCents = $booking->payments()->where('status', 'Completed')->sum('amount');
+            $totalPaidCents = $booking->payments()->sum('amount');
             $totalPaidFloat = $totalPaidCents / 100;
             $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
 
@@ -49,7 +48,7 @@ class ProcessGatewayPaymentService
             $booking->update([
                 'total_paid' => $totalPaidFloat,
                 'balance_due' => $balanceDueFloat,
-                'payment_status' => $balanceDueFloat <= 0 ? PaymentStatus::Paid : PaymentStatus::Partial,
+                'payment_status' => $balanceDueFloat <= 0 ? PaymentStatus::Paid : PaymentStatus::PartiallyPaid,
                 // Transition booking status to Confirmed only if fully paid
                 'booking_status' => $balanceDueFloat <= 0 ? \App\Enums\BookingStatus::Confirmed : $booking->booking_status,
             ]);

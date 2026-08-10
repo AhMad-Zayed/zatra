@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Boarding Pass - {{ $booking->pnr_code ?? $booking->id }}</title>
+    <title>Boarding Pass - {{ $booking->pnr ?? $booking->id }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
@@ -60,7 +60,7 @@
             <div class="flex items-center gap-6 text-left" dir="ltr">
                 <div class="text-right">
                     <p class="text-xs text-gray-400 uppercase tracking-widest mb-1">Booking Ref (PNR)</p>
-                    <p class="text-2xl font-bold font-mono text-yellow-400">{{ $booking->pnr_code ?? str_pad($booking->id, 6, '0', STR_PAD_LEFT) }}</p>
+                    <p class="text-2xl font-bold font-mono text-yellow-400">{{ $booking->pnr ?? str_pad($booking->id, 6, '0', STR_PAD_LEFT) }}</p>
                 </div>
                 <div class="bg-white p-2 rounded shadow-sm">
                     {!! $qrCode !!}
@@ -115,6 +115,7 @@
                     <thead class="bg-gray-50 text-gray-600 font-bold text-xs uppercase tracking-wider">
                         <tr>
                             <th class="px-6 py-3">الاسم (Name)</th>
+                            <th class="px-6 py-3">رقم المقعد (Seat)</th>
                             <th class="px-6 py-3">الفئة (Category)</th>
                             <th class="px-6 py-3">نوع الوثيقة (Doc Type)</th>
                             <th class="px-6 py-3">رقم الوثيقة (Doc Number)</th>
@@ -125,6 +126,9 @@
                         <tr class="hover:bg-gray-50">
                             <td class="px-6 py-4 whitespace-nowrap font-bold text-gray-900">
                                 {{ $passenger->first_name }} {{ $passenger->last_name }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-blue-600 font-bold text-center text-lg bg-blue-50/30">
+                                {{ $passenger->seat_number ?? '-' }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-gray-600">
                                 {{ $passenger->tripPassengerCategory->name ?? 'مسافر' }}

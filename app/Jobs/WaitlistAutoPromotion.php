@@ -36,12 +36,14 @@ class WaitlistAutoPromotion implements ShouldQueue
         if (!$nextWaitlist) return;
 
         // Check if there are available seats for their request
-        $available = \App\Models\InventoryLedger::where('trip_instance_id', $this->tripInstanceId)
+        $ledgerSum = \App\Models\InventoryLedger::where('trip_instance_id', $this->tripInstanceId)
             ->where(function ($q) {
                 $q->whereNull('expires_at')
                   ->orWhere('expires_at', '>', now());
             })
             ->sum('quantity');
+        
+        $available = $tripInstance->available_seats + $ledgerSum;
 
         if ($available >= $nextWaitlist->requested_seats) {
             // Create a 2-hour hold

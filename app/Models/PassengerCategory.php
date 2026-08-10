@@ -17,10 +17,12 @@ class PassengerCategory extends Model
         'tenant_id',
         'name',
         'default_price',
+        'requires_seat',
     ];
 
     protected $casts = [
         'default_price' => \App\Casts\MoneyCast::class,
+        'requires_seat' => 'boolean',
     ];
 
     protected static function booted(): void

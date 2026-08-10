@@ -2,9 +2,7 @@
 
 namespace App\Exceptions;
 
-use Exception;
-
-class InsufficientSeatsException extends Exception
+class InsufficientSeatsException extends InventoryExhaustedException
 {
     //
 }

@@ -46,7 +46,25 @@ class PaymentResource extends Resource
                     ->label('رقم مرجع الحجز')
                     ->required()
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->live()
+                    ->afterStateUpdated(function (Forms\Set $set, ?string $state) {
+                        if ($state) {
+                            $booking = \App\Models\Booking::find($state);
+                            if ($booking) {
+                                $set('currency', $booking->currency);
+                            }
+                        }
+                    }),
+                Forms\Components\Select::make('currency')
+                    ->label('العملة')
+                    ->options([
+                        'USD' => 'دولار (USD)',
+                        'ILS' => 'شيكل (ILS)',
+                    ])
+                    ->required()
+                    ->disabled()
+                    ->dehydrated(),
                 Forms\Components\TextInput::make('amount')
                     ->label('المبلغ')
                     ->numeric()
@@ -57,7 +75,7 @@ class PaymentResource extends Resource
                     ->options([
                         'cash' => 'نقدي',
                         'transfer' => 'تحويل بنكي',
-                        'visa' => 'بطاقة ائتمان / فيزا',
+                        // 'visa' => 'بطاقة ائتمان / فيزا', // Disabled electronic payment
                     ])
                     ->required(),
                 Forms\Components\Select::make('received_by')
@@ -92,7 +110,15 @@ class PaymentResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amount')
                     ->label('المبلغ')
-                    ->money('SAR')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('currency')
+                    ->label('العملة')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'USD' => 'success',
+                        'ILS' => 'info',
+                        default => 'gray',
+                    })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_method')
                     ->label('طريقة الدفع')

@@ -64,7 +64,7 @@
                                     @foreach($booking->passengers as $passenger)
                                         <span class="inline-block bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-medium shadow-sm">
                                             <span class="material-symbols-outlined text-[14px] align-middle mr-1 text-zatara-gold">person</span>
-                                            {{ $passenger->dynamic_data['name'] ?? 'مسافر' }} - <bdi>{{ optional($passenger->tripPassengerCategory)->name ?? '' }}</bdi>
+                                            {{ $passenger->first_name . ' ' . $passenger->last_name }} - <bdi>{{ optional($passenger->tripPassengerCategory)->name ?? '' }}</bdi>
                                         </span>
                                     @endforeach
                                 </div>
@@ -114,7 +114,7 @@
             </div>
             
             <div class="text-center mt-12">
-                <a href="/" class="text-zatara-blue hover:text-zatara-gold font-bold transition-colors inline-flex items-center gap-2">
+                <a href="{{ route('storefront.catalog', ['tenant' => $booking->tenant->slug]) }}" class="text-zatara-blue hover:text-zatara-gold font-bold transition-colors inline-flex items-center gap-2">
                     العودة للصفحة الرئيسية
                     <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
                 </a>

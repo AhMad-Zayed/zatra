@@ -16,13 +16,15 @@ class TemplatePassengerCategory extends Model
     protected $fillable = [
         'tenant_id',
         'trip_template_id',
-        'global_pricing_tier_id',
+        'passenger_category_id',
         'name',
         'price',
+        'requires_seat',
     ];
 
     protected $casts = [
         'price' => \App\Casts\MoneyCast::class,
+        'requires_seat' => 'boolean',
     ];
 
     protected static function booted(): void

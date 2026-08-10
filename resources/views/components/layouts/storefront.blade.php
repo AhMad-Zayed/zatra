@@ -74,7 +74,7 @@
                     @endif
 
                     @auth('customer')
-                        <a href="#" class="transition-colors" :class="scrolled ? 'text-zatara-blue' : 'text-white'">
+                        <a href="{{ route('storefront.my-bookings', ['tenant' => $currentTenant->slug]) }}" class="transition-colors" :class="scrolled ? 'text-zatara-blue' : 'text-white'">
                             <span class="material-symbols-outlined text-[32px]" style="font-variation-settings:'FILL' 0">account_circle</span>
                         </a>
                     @endauth

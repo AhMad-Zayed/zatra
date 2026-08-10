@@ -14,7 +14,7 @@ class BookingObserver
     public function created(Booking $booking): void
     {
         // When a booking is created, notify the customer if it's pending
-        if ($booking->booking_status === \App\Enums\BookingStatus::Pending) {
+        if ($booking->booking_status === \App\Enums\BookingStatus::Pending && $booking->customer) {
             $booking->customer->notify(new BookingPending($booking));
         }
     }

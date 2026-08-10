@@ -141,7 +141,7 @@
                         {{-- Image Container --}}
                         <div class="relative w-full aspect-[4/3] rounded-[1.25rem] overflow-hidden mb-5">
                             @php
-                                $mediaUrl = $template->getFirstMediaUrl('trip_images') ?: ($firstInstance ? $firstInstance->getFirstMediaUrl('trip_images') : null);
+                                $mediaUrl = $template->getFirstMediaUrl('cover') ?: ($firstInstance ? $firstInstance->getFirstMediaUrl('cover') : null);
                             @endphp
                             @if($mediaUrl)
                                 <img src="{{ $mediaUrl }}" alt="{{ $template->title ?? 'صورة الرحلة' }}" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />

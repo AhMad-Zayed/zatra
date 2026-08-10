@@ -18,6 +18,6 @@ class TicketController extends Controller
             abort(404, 'Ticket not generated yet.');
         }
 
-        return response()->download($media->getPath(), 'BoardingPass_'.$booking->pnr_code.'.pdf');
+        return response()->download($media->getPath(), 'BoardingPass_'.$booking->pnr.'.pdf');
     }
 }

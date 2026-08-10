@@ -25,13 +25,31 @@ class Passenger extends Model implements HasMedia
         'date_of_birth',
         'gender',
         'extra_preferences',
+        // Phone booking mode: seat reserved, data collected later via self-service link
+        'data_complete',
+        'passenger_label',
+        'seat_number',
+        'is_checked_in',
     ];
 
     protected $casts = [
         'price_at_booking' => \App\Casts\MoneyCast::class,
         'date_of_birth' => 'date',
         'extra_preferences' => 'array',
+        'data_complete' => 'boolean',
+        'is_checked_in' => 'boolean',
     ];
+
+    /**
+     * Display name: shows actual name if known, otherwise the placeholder label.
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if (!empty($this->first_name)) {
+            return trim($this->first_name . ' ' . $this->last_name);
+        }
+        return $this->passenger_label ?? 'راكب غير مُعرَّف';
+    }
 
     protected static function booted(): void
     {
