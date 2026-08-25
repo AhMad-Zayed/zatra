@@ -80,27 +80,31 @@ class DashboardStatsOverview extends BaseWidget
             Stat::make('حجوزات اليوم', $bookingsToday)
                 ->description('الحجوزات التي تمت اليوم')
                 ->descriptionIcon('heroicon-m-calendar-days')
-                ->color('primary'),
+                ->color('gray'),
 
             Stat::make('إجمالي الإيرادات', $formattedRevenue . ' ' . $currency)
                 ->description('إجمالي المبالغ المستلمة فعلياً')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
 
+            // Attention-needed state: money still owed stands out in the brand's danger red;
+            // a fully-settled book of business (0 outstanding) reads as neutral, not alarming.
             Stat::make('الأرصدة المعلقة', $formattedOutstanding . ' ' . $currency)
                 ->description('مبالغ قيد الانتظار أو الدفع النقدي المتأخر')
                 ->descriptionIcon('heroicon-m-clock')
-                ->color('danger'),
+                ->color($rawOutstanding > 0 ? 'danger' : 'gray'),
 
             Stat::make('نسبة إشغال المقاعد', $occupancyRate . '%')
                 ->description("الركاب: {$bookedPassengers} / السعة: {$totalCapacity}")
                 ->descriptionIcon('heroicon-m-users')
-                ->color('warning'),
+                ->color('gray'),
 
+            // Attention-needed state: a non-empty waitlist is an action item (seats to release),
+            // flagged with the brand's warning gold; an empty waitlist is neutral.
             Stat::make('طلبات قائمة الانتظار', $waitlistCount)
                 ->description('طلبات بانتظار توفر مقاعد')
                 ->descriptionIcon('heroicon-m-queue-list')
-                ->color('info'),
+                ->color($waitlistCount > 0 ? 'warning' : 'gray'),
         ];
     }
 }

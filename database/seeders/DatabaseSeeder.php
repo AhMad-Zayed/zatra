@@ -128,9 +128,12 @@ class DatabaseSeeder extends Seeder
             'tenant_id' => $tenant->id, 'booking_id' => $booking1->id, 'trip_passenger_category_id' => $activeAdultTier->id,
             'first_name' => 'Ahmed', 'last_name' => 'Al-Paid', 'document_type' => 'passport', 'document_number' => 'P1234567'
         ]);
+        // Spread demo payments across separate months rather than stacking them all in the
+        // current month — a single-month spike on the revenue chart reads as unrealistic seed
+        // data in screenshots/demos.
         Payment::firstOrCreate([
             'tenant_id' => $tenant->id, 'booking_id' => $booking1->id, 'amount' => 500000, 'payment_method' => 'cash'
-        ], ['created_at' => now()]);
+        ], ['created_at' => now()->subMonths(5)]);
 
         // Balance Due Booking
         $booking2 = Booking::firstOrCreate(
@@ -153,7 +156,7 @@ class DatabaseSeeder extends Seeder
         ]);
         Payment::firstOrCreate([
             'tenant_id' => $tenant->id, 'booking_id' => $booking2->id, 'amount' => 200000, 'payment_method' => 'bank_transfer'
-        ], ['created_at' => now()]);
+        ], ['created_at' => now()->subMonths(2)]);
 
         // 9. Waiting List
         $waitlist1 = WaitingList::firstOrCreate([

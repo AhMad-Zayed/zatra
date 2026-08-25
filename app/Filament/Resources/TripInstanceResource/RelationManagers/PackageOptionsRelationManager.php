@@ -35,7 +35,7 @@ class PackageOptionsRelationManager extends RelationManager
                 TextInput::make('hotel_name')
                     ->label('اسم الفندق')
                     ->nullable()
-                    ->placeholder('Marriott Hotel'),
+                    ->placeholder('فندق الريتز كارلتون'),
                 Select::make('stars')
                     ->label('عدد النجوم')
                     ->options([

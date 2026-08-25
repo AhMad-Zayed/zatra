@@ -263,7 +263,7 @@ class ViewBooking extends ViewRecord
                             ->label('سبب الإلغاء')
                             ->options([
                                 'customer_request'   => 'طلب العميل',
-                                'no_show'            => 'لم يحضر (No Show)',
+                                'no_show'            => 'لم يحضر',
                                 'medical'            => 'أسباب طبية',
                                 'travel_issue'       => 'مشكلة سفر / وثائق',
                                 'other'              => 'أخرى',

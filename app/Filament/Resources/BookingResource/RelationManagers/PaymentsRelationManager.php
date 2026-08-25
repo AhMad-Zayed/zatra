@@ -147,7 +147,7 @@ class PaymentsRelationManager extends RelationManager
                         try {
                             app(\App\Services\BookingService::class)->reversePayment(
                                 $record,
-                                'Manual reversal via admin panel',
+                                'عكس يدوي عبر لوحة التحكم',
                                 auth()->user(),
                             );
                         } catch (\RuntimeException $e) {

@@ -20,8 +20,8 @@ class ListBookings extends ListRecords
     public function getTabs(): array
     {
         return [
-            'all' => \Filament\Resources\Components\Tab::make('الكل (All)'),
-            'cancellation_requests' => \Filament\Resources\Components\Tab::make('طلبات الإلغاء (Cancellation Requests)')
+            'all' => \Filament\Resources\Components\Tab::make('الكل'),
+            'cancellation_requests' => \Filament\Resources\Components\Tab::make('طلبات الإلغاء')
                 ->badge(\App\Models\Booking::whereNotNull('cancellation_requested_at')
                     ->where('booking_status', '!=', \App\Enums\BookingStatus::Cancelled)
                     ->count())

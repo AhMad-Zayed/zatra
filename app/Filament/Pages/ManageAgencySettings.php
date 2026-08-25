@@ -10,6 +10,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Select;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Facades\Filament;
@@ -64,7 +65,7 @@ class ManageAgencySettings extends Page
         return $form
             ->schema([
                 Section::make('معلومات الاتصال وحسابات التواصل')
-                    ->description('يتم حفظ هذه البيانات بتنسيق JSON (Light Data).')
+                    ->description('يتم حفظ هذه البيانات بتنسيق JSON (بيانات خفيفة).')
                     ->schema([
                         Grid::make(2)->schema([
                             TextInput::make('contact_phone')
@@ -105,7 +106,7 @@ class ManageAgencySettings extends Page
                             ->helperText('حدد كيف سيتم إبلاغ الزبائن عند توفر مقعد شاغر من قائمة الانتظار.')
                     ]),
 
-                Section::make('الأسئلة الشائعة (FAQs)')
+                Section::make('الأسئلة الشائعة')
                     ->description('تُعرض في ذيل صفحة المتجر.')
                     ->schema([
                         Repeater::make('faqs')
@@ -124,7 +125,7 @@ class ManageAgencySettings extends Page
                     ]),
 
                 Section::make('الشروط والسياسات القانونية')
-                    ->description('بيانات نصية ضخمة تُحفظ مباشرة في أعمدة قاعدة البيانات (Heavy Data).')
+                    ->description('بيانات نصية ضخمة تُحفظ مباشرة في أعمدة قاعدة البيانات (بيانات ثقيلة).')
                     ->schema([
                         TextInput::make('tourism_license_number')
                             ->label('رقم الترخيص السياحي')

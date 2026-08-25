@@ -9,7 +9,7 @@ use Carbon\Carbon;
 
 class RevenueChart extends ChartWidget
 {
-    protected static ?string $heading = 'التدفقات النقدية السنوية (Annual Cash Flow)';
+    protected static ?string $heading = 'التدفقات النقدية السنوية';
     protected int | string | array $columnSpan = 'full';
     protected static ?int $sort = 2;
 

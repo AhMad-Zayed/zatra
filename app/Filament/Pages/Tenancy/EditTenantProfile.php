@@ -25,7 +25,7 @@ class EditTenantProfile extends BaseEditTenantProfile
                             ->label('اسم الشركة')
                             ->required(),
                         TextInput::make('domain')
-                            ->label('النطاق (Domain)')
+                            ->label('النطاق')
                             ->url(),
                     ]),
                 
@@ -43,7 +43,7 @@ class EditTenantProfile extends BaseEditTenantProfile
                             ->default(true),
                         
                         Toggle::make('enable_sms_alerts')
-                            ->label('الرسائل النصية SMS')
+                            ->label('الرسائل النصية القصيرة')
                             ->helperText('إرسال الرمز التعريفي ورابط التذكرة عبر رسالة نصية قصيرة')
                             ->default(true),
                     ])->columns(1),

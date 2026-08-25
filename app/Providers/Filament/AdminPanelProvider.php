@@ -57,6 +57,15 @@ class AdminPanelProvider extends PanelProvider
                 HTML))
             ->brandLogoHeight('2rem')
             ->favicon(asset('favicon.svg'))
+            // The topbar has no top-navigation content when using sidebar navigation (Filament
+            // only renders logo/nav-groups into the topbar in ->topNavigation() mode), leaving a
+            // wide empty stretch between the sidebar and the search/user-menu cluster. Filling
+            // the topbar's leading edge with the active agency name gives that space an
+            // intentional purpose instead of reading as an unfinished gap.
+            ->renderHook(
+                \Filament\View\PanelsRenderHook::TOPBAR_START,
+                fn (): \Illuminate\Contracts\View\View => view('filament.partials.topbar-tenant-label'),
+            )
             ->tenant(Tenant::class)
             ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
             ->tenantMiddleware([

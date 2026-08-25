@@ -8,7 +8,7 @@ use Filament\Tables\Table;
 
 class AutomationStatusWidget extends BaseWidget
 {
-    protected static ?string $heading = 'حالة النظام الآلي (Automation Engine)';
+    protected static ?string $heading = 'حالة النظام الآلي';
     protected int | string | array $columnSpan = 'full';
     protected static ?int $sort = 4;
 
@@ -39,6 +39,10 @@ class AutomationStatusWidget extends BaseWidget
                     ]),
             ])
             ->defaultSort('last_run_at', 'desc')
-            ->paginated([5, 10]);
+            ->paginated([5, 10])
+            ->searchPlaceholder('البحث باسم العملية...')
+            ->emptyStateIcon('heroicon-o-cpu-chip')
+            ->emptyStateHeading('لا توجد عمليات آلية مسجلة بعد')
+            ->emptyStateDescription('ستظهر هنا سجلات تشغيل المهام الآلية (مثل التذكيرات وتحديثات المخزون) بمجرد بدء تنفيذها.');
     }
 }

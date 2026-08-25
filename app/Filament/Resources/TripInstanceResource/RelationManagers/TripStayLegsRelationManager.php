@@ -25,7 +25,7 @@ use Filament\Tables\Table;
 class TripStayLegsRelationManager extends RelationManager
 {
     protected static string $relationship = 'tripStayLegs';
-    protected static ?string $title = 'مراحل الإقامة (Legs)';
+    protected static ?string $title = 'مراحل الإقامة';
 
     public function form(Form $form): Form
     {

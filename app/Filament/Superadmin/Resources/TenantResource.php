@@ -37,24 +37,24 @@ class TenantResource extends Resource
                 Forms\Components\Toggle::make('is_active')
                     ->default(true),
 
-                Forms\Components\Section::make('Atlahub (Chatwoot) Integration')
+                Forms\Components\Section::make('تكامل Atlahub (Chatwoot)')
                     ->description('إعدادات الربط مع منصة أطلس هب للواتساب')
                     ->schema([
                         Forms\Components\TextInput::make('settings.atlahub_api_url')
-                            ->label('API URL')
+                            ->label('رابط API')
                             ->url()
                             ->default('https://chat.atlahub.com')
                             ->required(),
                         Forms\Components\TextInput::make('settings.atlahub_account_id')
-                            ->label('Account ID')
+                            ->label('معرف الحساب')
                             ->numeric()
                             ->required(),
                         Forms\Components\TextInput::make('settings.atlahub_inbox_id')
-                            ->label('Inbox ID (WhatsApp)')
+                            ->label('معرف صندوق الواتساب')
                             ->numeric()
                             ->required(),
                         Forms\Components\TextInput::make('settings.atlahub_api_token')
-                            ->label('API Token')
+                            ->label('رمز API')
                             ->password()
                             ->required(),
                     ])->columns(2),
@@ -86,7 +86,7 @@ class TenantResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('toggleActive')
-                    ->label(fn (Tenant $record): string => $record->is_active ? 'Suspend' : 'Activate')
+                    ->label(fn (Tenant $record): string => $record->is_active ? 'تعليق' : 'تفعيل')
                     ->color(fn (Tenant $record): string => $record->is_active ? 'danger' : 'success')
                     ->icon(fn (Tenant $record): string => $record->is_active ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
                     ->action(function (Tenant $record) {

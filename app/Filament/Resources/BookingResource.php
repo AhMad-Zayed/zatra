@@ -829,7 +829,7 @@ class BookingResource extends Resource
                                 ->label('سبب الإلغاء')
                                 ->options([
                                     'customer_request' => 'طلب العميل',
-                                    'no_show'          => 'لم يحضر (No Show)',
+                                    'no_show'          => 'لم يحضر',
                                     'medical'          => 'أسباب طبية',
                                     'travel_issue'     => 'مشكلة وثائق / سفر',
                                     'other'            => 'أخرى',

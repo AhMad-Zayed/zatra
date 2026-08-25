@@ -685,7 +685,7 @@ class BookingService
             }
 
             if ($booking->total_paid < $original->amount) {
-                throw new \RuntimeException('Refund Limit Exceeded: Cannot refund more than the net paid amount.');
+                throw new \RuntimeException('تجاوز حد الاسترداد: لا يمكن استرداد مبلغ أكبر من صافي المبلغ المدفوع.');
             }
 
             $reversal = Payment::create([

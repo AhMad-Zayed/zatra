@@ -65,7 +65,7 @@ class TripBuilderResource extends Resource
                                     }
                                 }),
                             Forms\Components\Select::make('pickup_routes')
-                                ->label('مسارات التجمع (Pickup Routes)')
+                                ->label('مسارات التجمع')
                                 ->multiple()
                                 ->options(\App\Models\PickupRoute::pluck('name', 'id'))
                                 ->searchable()
@@ -129,7 +129,7 @@ class TripBuilderResource extends Resource
                                 ])->columns(3)->defaultItems(0),
                         ]),
 
-                    Forms\Components\Wizard\Step::make('الجدولة (Schedule)')
+                    Forms\Components\Wizard\Step::make('الجدولة')
                         ->schema([
                             Forms\Components\TextInput::make('seats_count')
                                 ->label('عدد المقاعد للرحلة')
@@ -179,7 +179,7 @@ class TripBuilderResource extends Resource
                         ->schema([
                             Forms\Components\Placeholder::make('summary')
                                 ->label('ملخص العملية')
-                                ->content('اضغط على "Create" أدناه ليتم إنشاء القالب وتوليد المواعيد المجدولة في الخلفية.'),
+                                ->content('اضغط على "إضافة" أدناه ليتم إنشاء القالب وتوليد المواعيد المجدولة في الخلفية.'),
                             Forms\Components\Toggle::make('publish_immediately')
                                 ->label('نشر الرحلات فوراً للعملاء (Active)')
                                 ->default(true),
