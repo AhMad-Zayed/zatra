@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\ResolveStorefrontTenant;
 use App\Http\Controllers\StorefrontController;
 use App\Http\Controllers\PortalController;
-use App\Livewire\Storefront\Checkout;
 
 Route::middleware([ResolveStorefrontTenant::class])->group(function () {
     // Portal auth routes (Dashboard/Logout)
@@ -34,6 +33,7 @@ Route::prefix('{tenant:slug}')->middleware(['tenant.customer'])->group(function 
     // Socialite Routes
     Route::get('/auth/{provider}', [\App\Http\Controllers\Auth\SocialAuthController::class, 'redirect'])->name('social.redirect');
     Route::get('/auth/{provider}/callback', [\App\Http\Controllers\Auth\SocialAuthController::class, 'callback'])->name('social.callback');
+    Route::get('/auth/confirm-link', \App\Livewire\Auth\ConfirmSocialLink::class)->name('social.confirm-link');
     
     // 2. Trip Details Page (Using TripTemplate slug)
     Route::get('/trip/{tripTemplate:slug}', \App\Livewire\TripDetails::class)
@@ -114,7 +114,9 @@ Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
 })->name('login.magic');
 
 // --- MAGIC LINK / CUSTOMER PORTAL ---
-Route::get('/b/{uuid}', \App\Livewire\CustomerBookingPortal::class)->name('customer.booking.portal');
+Route::get('/b/{uuid}', \App\Livewire\CustomerBookingPortal::class)
+    ->name('customer.booking.portal')
+    ->middleware(['auth:customer']);
 
 Route::get('/b/{uuid}/ticket/download', function ($uuid) {
     $booking = \App\Models\Booking::where('uuid', $uuid)->firstOrFail();
@@ -127,7 +129,8 @@ Route::get('/b/{uuid}/ticket/download', function ($uuid) {
     }
     
     return response()->download($media->getPath(), "Ticket_{$booking->pnr}.pdf");
-})->name('customer.ticket.download');
+})->name('customer.ticket.download')
+->middleware(['auth:customer']);
 
 // --- TOUR GUIDE MANIFEST ---
 Route::get('/g/{uuid}', \App\Livewire\TourGuideManifest::class)->name('tour.guide.manifest');

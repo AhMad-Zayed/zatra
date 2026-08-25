@@ -74,9 +74,8 @@ class ViewBooking extends ViewRecord
                         'trip_instance_id', $record->trip_instance_id
                     )->get()->keyBy('id');
 
-                    $totalNewSeats  = 0;
-                    $additionalAmount = 0;
-                    $newPassengers  = [];
+                    $totalNewSeats = 0;
+                    $specs = [];
 
                     foreach ($data as $key => $count) {
                         if (!str_starts_with($key, 'cat_')) continue;
@@ -84,15 +83,10 @@ class ViewBooking extends ViewRecord
                         if ($count <= 0) continue;
 
                         $catId = (int) str_replace('cat_', '', $key);
-                        $cat   = $categories->get($catId);
-                        if (!$cat) continue;
+                        if (!$categories->has($catId)) continue;
 
                         for ($i = 0; $i < $count; $i++) {
-                            $newPassengers[] = [
-                                'category'    => $cat,
-                                'label_index' => $record->passengers()->count() + $totalNewSeats + $i + 1,
-                            ];
-                            $additionalAmount += $cat->price; // cents
+                            $specs[] = ['trip_passenger_category_id' => $catId];
                         }
                         $totalNewSeats += $count;
                     }
@@ -111,41 +105,15 @@ class ViewBooking extends ViewRecord
                         return;
                     }
 
-                    DB::transaction(function () use ($record, $newPassengers, $additionalAmount, $totalNewSeats) {
-                        $tenantId      = $record->tenant_id;
-                        $overrideAmount = 0;
-
-                        foreach ($newPassengers as $pInfo) {
-                            $cat = $pInfo['category'];
-                            \App\Models\Passenger::create([
-                                'tenant_id'                  => $tenantId,
-                                'booking_id'                 => $record->id,
-                                'trip_passenger_category_id' => $cat->id,
-                                'price_at_booking'           => $cat->price + $overrideAmount,
-                                'first_name'                 => null,
-                                'last_name'                  => null,
-                                'data_complete'              => false,
-                                'passenger_label'            => "راكب {$pInfo['label_index']} ({$cat->name})",
-                                'extra_preferences'          => [],
-                            ]);
-                        }
-
-                        \App\Models\InventoryLedger::create([
-                            'trip_instance_id' => $record->trip_instance_id,
-                            'booking_id'       => $record->id,
-                            'quantity'         => -$totalNewSeats,
-                            'type'             => 'confirmed',
-                            'expires_at'       => null,
-                        ]);
-
-                        $newGrandTotal = $record->grand_total + ($additionalAmount / 100);
-                        $newBalanceDue = $record->balance_due + ($additionalAmount / 100);
-
-                        DB::table('bookings')->where('id', $record->id)->update([
-                            'grand_total' => (int) ($newGrandTotal * 100),
-                            'balance_due' => (int) ($newBalanceDue * 100),
-                        ]);
-                    });
+                    try {
+                        app(\App\Services\BookingService::class)->addPassengers($record, $specs);
+                    } catch (\App\Exceptions\InsufficientSeatsException $e) {
+                        Notification::make()->danger()
+                            ->title('لا توجد مقاعد كافية')
+                            ->body($e->getMessage())
+                            ->send();
+                        return;
+                    }
 
                     Notification::make()
                         ->success()
@@ -217,47 +185,37 @@ class ViewBooking extends ViewRecord
                         ->nullable(),
                 ])
                 ->action(function (array $data, $record) {
-                    DB::transaction(function () use ($data, $record) {
-                        // Pessimistic lock to prevent race conditions during payment
-                        $record = \App\Models\Booking::lockForUpdate()->find($record->id);
+                    // P0-6: delegates to the canonical service, which owns the transaction,
+                    // the booking lock, the payment write, and the recalculation/status
+                    // transition — this action becomes thin orchestration (ticketing/
+                    // notification) only. 'reference_note' has no matching DB column
+                    // (only 'reference_number' exists) and was previously silently discarded
+                    // by mass-assignment protection; now correctly mapped to the real column.
+                    app(\App\Services\BookingService::class)->recordPayment(
+                        $record,
+                        (float) $data['amount'],
+                        $data['payment_method'],
+                        auth()->user(),
+                        \App\Enums\PaymentType::PAYMENT,
+                        $data['reference_note'] ?? null,
+                    );
 
-                        // Create Payment
-                        $record->payments()->create([
-                            'tenant_id' => $record->tenant_id,
-                            'amount' => $data['amount'],
-                            'payment_method' => $data['payment_method'],
-                            'reference_note' => $data['reference_note'] ?? null,
-                        ]);
+                    $record = $record->fresh();
 
-                        // Update Ledger
-                        $newTotalPaid = $record->total_paid + $data['amount'];
-                        $newBalanceDue = $record->balance_due - $data['amount'];
+                    if ($record->payment_status === \App\Enums\PaymentStatus::Paid) {
+                        if (class_exists(\App\Services\TicketGenerationService::class)) {
+                            $ticketService = app(\App\Services\TicketGenerationService::class);
+                            $ticketPath = $ticketService->generateAndStoreTicket($record);
 
-                        $record->update([
-                            'total_paid' => $newTotalPaid,
-                            'balance_due' => $newBalanceDue,
-                        ]);
-
-                        // Status Transition & Ticketing
-                        if ($record->balance_due <= 0) {
-                            $record->update(['booking_status' => BookingStatus::Confirmed]);
-                            
-                            // Trigger Ticket
-                            if (class_exists(\App\Services\TicketGenerationService::class)) {
-                                $ticketService = app(\App\Services\TicketGenerationService::class);
-                                $ticketPath = $ticketService->generateAndStoreTicket($record);
-                                
-                                // Dispatch Job (Assuming it exists or will be generated)
-                                if (class_exists(\App\Jobs\SendBookingNotificationJob::class)) {
-                                    \App\Jobs\SendBookingNotificationJob::dispatch($record, $ticketPath);
-                                }
+                            if (class_exists(\App\Jobs\SendBookingNotificationJob::class)) {
+                                \App\Jobs\SendBookingNotificationJob::dispatch($record, $ticketPath);
                             }
-                            
-                            Notification::make()->title('تم تسجيل الدفعة واكتمال الحجز')->success()->send();
-                        } else {
-                            Notification::make()->title('تم تسجيل الدفعة بنجاح')->success()->send();
                         }
-                    });
+
+                        Notification::make()->title('تم تسجيل الدفعة واكتمال الحجز')->success()->send();
+                    } else {
+                        Notification::make()->title('تم تسجيل الدفعة بنجاح')->success()->send();
+                    }
                 }),
 
             // ── إلغاء ركاب محددين ────────────────────────────────────────────
@@ -336,56 +294,17 @@ class ViewBooking extends ViewRecord
                     }
 
                     $seatsToRelease = $passengers->count();
-                    $amountToDeduct = $passengers->sum('price_at_booking'); // already in cents
+                    $amountToDeduct = $passengers->sum('price_at_booking'); // major currency units (MoneyCast), display only
 
-                    DB::transaction(function () use ($record, $passengers, $seatsToRelease, $amountToDeduct, $data) {
-                        // 1. Soft-delete the selected passengers
-                        foreach ($passengers as $passenger) {
-                            $passenger->extra_preferences = array_merge(
-                                $passenger->extra_preferences ?? [],
-                                [
-                                    'cancelled_at'       => now()->toISOString(),
-                                    'cancelled_reason'   => $data['cancellation_reason'],
-                                    'cancellation_note'  => $data['cancellation_note'] ?? null,
-                                    'cancelled_by_user'  => auth()->id(),
-                                ]
-                            );
-                            $passenger->save();
-                            $passenger->delete(); // soft delete
-                        }
-
-                        // 2. Release seats back to inventory ledger (+positive = seats returned)
-                        \App\Models\InventoryLedger::create([
-                            'trip_instance_id' => $record->trip_instance_id,
-                            'booking_id'       => $record->id,
-                            'quantity'         => +$seatsToRelease,
-                            'type'             => 'cancellation',
-                            'expires_at'       => null,
-                        ]);
-
-                        // 3. Update financial totals (bypass immutable snapshot check via raw query)
-                        $currentGrandTotal = (int) DB::table('bookings')->where('id', $record->id)->value('grand_total');
-                        $currentBalanceDue = (int) DB::table('bookings')->where('id', $record->id)->value('balance_due');
-
-                        $newGrandTotal = max(0, $currentGrandTotal - $amountToDeduct);
-                        $newBalanceDue = max(0, $currentBalanceDue - $amountToDeduct);
-
-                        DB::table('bookings')->where('id', $record->id)->update([
-                            'grand_total' => $newGrandTotal,
-                            'balance_due' => $newBalanceDue,
-                        ]);
-
-                        // 4. If 0 passengers remain, cancel the whole booking
-                        $remainingPassengers = \App\Models\Passenger::where('booking_id', $record->id)->count();
-                        if ($remainingPassengers === 0) {
-                            DB::table('bookings')->where('id', $record->id)->update([
-                                'booking_status' => \App\Enums\BookingStatus::Cancelled->value,
-                            ]);
-                        }
-                    });
+                    app(\App\Services\BookingService::class)->cancelPassengers(
+                        $record,
+                        $passengers,
+                        $data['cancellation_reason'],
+                        $data['cancellation_note'] ?? null
+                    );
 
                     $remainingCount = \App\Models\Passenger::where('booking_id', $record->id)->count();
-                    $refundAmount   = number_format($amountToDeduct / 100, 0);
+                    $refundAmount   = number_format($amountToDeduct, 0);
 
                     Notification::make()
                         ->success()
@@ -428,50 +347,12 @@ class ViewBooking extends ViewRecord
                         ->maxValue(fn ($record) => $record->total_paid)
                         ->default(0),
                 ])
-                ->action(function (array $data, Booking $record): void {
-                    $passengers = $record->passengers()->get();
-                    $count = $passengers->count();
-
-                    DB::transaction(function () use ($data, $record, $passengers, $count) {
-                        // 1. Soft-delete all passengers
-                        foreach ($passengers as $p) {
-                            $p->extra_preferences = array_merge($p->extra_preferences ?? [], [
-                                'cancelled_at'     => now()->toISOString(),
-                                'cancelled_reason' => $data['cancellation_reason'],
-                                'cancelled_by'     => auth()->id(),
-                            ]);
-                            $p->save();
-                            $p->delete();
-                        }
-
-                        // 2. Return seats to inventory
-                        if ($count > 0) {
-                            \App\Models\InventoryLedger::create([
-                                'trip_instance_id' => $record->trip_instance_id,
-                                'booking_id'       => $record->id,
-                                'quantity'         => $count, // positive = returning seats
-                                'type'             => 'cancellation',
-                                'expires_at'       => null,
-                            ]);
-                        }
-
-                        // 3. Update booking financial & status
-                        $refundableAmount = $record->total_paid - $data['cancellation_fee'];
-                        $note = $record->notes . "\n[".now()."] تم إلغاء الحجز كلياً. رسوم الإلغاء: {$data['cancellation_fee']}. المبلغ المسترد الواجب إرجاعه: {$refundableAmount}.";
-                        
-                        DB::table('bookings')->where('id', $record->id)->update([
-                            'booking_status' => \App\Enums\BookingStatus::Cancelled->value,
-                            'cancellation_requested_at' => null,
-                            'notes' => trim($note),
-                            'grand_total' => $data['cancellation_fee'] * 100,
-                            'balance_due' => 0,
-                        ]);
-
-                        // 4. Notify waitlist
-                        if (class_exists(\App\Jobs\ProcessWaitingListJob::class)) {
-                            \App\Jobs\ProcessWaitingListJob::dispatch($record->tripInstance);
-                        }
-                    });
+                ->action(function (array $data, $record): void {
+                    app(\App\Services\BookingService::class)->cancelBooking(
+                        $record,
+                        $data['cancellation_reason'],
+                        (float) $data['cancellation_fee']
+                    );
 
                     Notification::make()
                         ->title('تم إلغاء الحجز كلياً واستعادة المقاعد')
@@ -543,71 +424,25 @@ class ViewBooking extends ViewRecord
                     $newTripId = $data['new_trip_instance_id'];
                     $newTrip = \App\Models\TripInstance::find($newTripId);
                     $passengers = $record->passengers()->get();
-                    $count = $passengers->count();
-
-                    if ($newTrip->remaining_seats < $count) {
-                        Notification::make()->danger()->title('المقاعد المتاحة لا تكفي في الرحلة الجديدة')->send();
-                        return;
-                    }
 
                     $newCategories = \App\Models\TripPassengerCategory::where('trip_instance_id', $newTripId)->get()->keyBy('id');
-                    $newGrandTotalCents = 0;
 
+                    $passengerCategoryMap = [];
                     foreach ($passengers as $p) {
                         $catId = $data["passenger_{$p->id}_category"] ?? null;
                         if (!$catId || !$newCategories->has($catId)) {
                             Notification::make()->danger()->title('يجب اختيار فئة لكل راكب')->send();
                             return;
                         }
-                        $newGrandTotalCents += $newCategories->get($catId)->price;
+                        $passengerCategoryMap[$p->id] = $catId;
                     }
 
-                    DB::transaction(function () use ($record, $newTripId, $passengers, $newCategories, $count, $newGrandTotalCents, $data) {
-                        $oldTripId = $record->trip_instance_id;
-
-                        // 1. Release old seats
-                        \App\Models\InventoryLedger::create([
-                            'trip_instance_id' => $oldTripId,
-                            'booking_id'       => $record->id,
-                            'quantity'         => $count, // positive = return
-                            'type'             => 'cancellation',
-                            'expires_at'       => null,
-                        ]);
-
-                        // 2. Consume new seats
-                        \App\Models\InventoryLedger::create([
-                            'trip_instance_id' => $newTripId,
-                            'booking_id'       => $record->id,
-                            'quantity'         => -$count, // negative = consume
-                            'type'             => 'confirmed',
-                            'expires_at'       => null,
-                        ]);
-
-                        // 3. Update passengers
-                        foreach ($passengers as $p) {
-                            $catId = $data["passenger_{$p->id}_category"];
-                            $cat = $newCategories->get($catId);
-                            $p->update([
-                                'trip_passenger_category_id' => $cat->id,
-                                'price_at_booking' => $cat->price,
-                            ]);
-                        }
-
-                        // 4. Update booking totals
-                        $gt = $newGrandTotalCents;
-                        $paid = (int) DB::table('bookings')->where('id', $record->id)->value('total_paid');
-                        $paidCents = $paid * 100;
-                        $bd = max(0, $gt - $paidCents);
-
-                        $note = $record->notes . "\n[".now()."] تم تحويل الحجز من الرحلة #{$oldTripId} إلى #{$newTripId}.";
-
-                        DB::table('bookings')->where('id', $record->id)->update([
-                            'trip_instance_id' => $newTripId,
-                            'grand_total' => $gt,
-                            'balance_due' => $bd,
-                            'notes' => trim($note),
-                        ]);
-                    });
+                    try {
+                        app(\App\Services\BookingService::class)->transferBooking($record, $newTrip, $passengerCategoryMap);
+                    } catch (\App\Exceptions\InsufficientSeatsException $e) {
+                        Notification::make()->danger()->title('المقاعد المتاحة لا تكفي في الرحلة الجديدة')->send();
+                        return;
+                    }
 
                     Notification::make()
                         ->title('تم تحويل الحجز بنجاح')

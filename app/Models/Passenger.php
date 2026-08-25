@@ -27,6 +27,9 @@ class Passenger extends Model implements HasMedia
         'extra_preferences',
         // Phone booking mode: seat reserved, data collected later via self-service link
         'data_complete',
+        // Distinct from data_complete: whether this passenger satisfies the trip's attached
+        // RequirementPreset (text/date/image items), not just whether a name was given.
+        'requirements_complete',
         'passenger_label',
         'seat_number',
         'is_checked_in',
@@ -37,6 +40,7 @@ class Passenger extends Model implements HasMedia
         'date_of_birth' => 'date',
         'extra_preferences' => 'array',
         'data_complete' => 'boolean',
+        'requirements_complete' => 'boolean',
         'is_checked_in' => 'boolean',
     ];
 

@@ -27,8 +27,8 @@ class BookingPending extends Notification
     public function toWhatsApp(object $notifiable): WhatsAppMessage
     {
         $phone = $notifiable->phone ?? '';
-        $ref = $this->booking->reference ?? '';
-        $amount = number_format($this->booking->total_amount, 2);
+        $ref = $this->booking->pnr ?? '';
+        $amount = number_format((float) ($this->booking->grand_total ?? $this->booking->total_amount ?? 0), 2);
 
         return WhatsAppMessage::create()
             ->to($phone)

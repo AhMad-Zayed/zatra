@@ -59,6 +59,26 @@
                                     </div>
                                 </div>
                             @endif
+                            {{-- Hotel/Rooming redesign Ticket 2 — additive, alongside the
+                                 packageOption block above, not replacing it. --}}
+                            @if($booking->roomSelections->isNotEmpty())
+                                <div class="col-span-2 mt-2 pt-2 border-t border-slate-100">
+                                    <p class="text-slate-400 mb-2">الغرف المحجوزة</p>
+                                    <div class="flex flex-col gap-1">
+                                        @foreach($booking->roomSelections as $selection)
+                                            <div class="flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-zatara-gold text-[20px]">bed</span>
+                                                <span class="font-bold text-slate-700">
+                                                    {{ $selection->roomType->name }} &times; {{ $selection->quantity }}
+                                                </span>
+                                                <span class="text-xs text-slate-400 mr-2">
+                                                    ({{ $selection->occupancy_type->getLabel() }})
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                             <div class="col-span-2 mt-2 pt-2 border-t border-slate-100">
                                 <p class="text-slate-400 mb-2">المسافرون <span dir="ltr">({{ $booking->passengers->count() }})</span></p>
                                 <div class="flex flex-wrap gap-2">

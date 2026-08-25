@@ -8,13 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Enums\TripStatusEnum;
-use App\Traits\HasTripState;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 class TripInstance extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes, HasTripState, InteractsWithMedia;
+    use HasFactory, SoftDeletes, InteractsWithMedia;
 
     protected $fillable = [
         'uuid',
@@ -95,9 +94,46 @@ class TripInstance extends Model implements HasMedia
         return $this->hasManyThrough(Passenger::class, Booking::class);
     }
 
+    public function activePassengers(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
+    {
+        return $this->hasManyThrough(Passenger::class, Booking::class)
+                    ->whereNotIn('bookings.booking_status', ['cancelled', 'failed']);
+    }
+
     public function packageOptions(): HasMany
     {
         return $this->hasMany(PackageOption::class)->orderBy('sort_order');
+    }
+
+    // Hotel/Rooming redesign Phase 1 — built alongside packageOptions() above, not replacing
+    // it yet. See docs discussion: PackageOption stays fully live until Ticket 2/3 migrate its
+    // call sites over.
+    public function tripStayLegs(): HasMany
+    {
+        return $this->hasMany(TripStayLeg::class)->orderBy('sequence');
+    }
+
+    /**
+     * True only if the trip's accommodation catalog actually has at least one active room type
+     * AND the tenant-level kill switch (tenants.settings['room_booking_enabled']) is on.
+     * Belt-and-suspenders single source of truth for whether room-selection UI/payloads should
+     * be honored anywhere — both the "does data exist" check and the "is the feature enabled"
+     * check are combined here so no caller can accidentally check only one of the two.
+     * Defaults to false (opt-in per tenant), per the Ticket 2 rollout decision.
+     */
+    public function getRoomBookingIsAvailableAttribute(): bool
+    {
+        $enabledForTenant = (bool) ($this->tenant?->settings['room_booking_enabled'] ?? false);
+
+        if (!$enabledForTenant) {
+            return false;
+        }
+
+        return $this->tripStayLegs()
+            ->whereHas('hotelOptions', function ($q) {
+                $q->where('is_active', true)->whereHas('roomTypes', fn ($q2) => $q2->where('is_active', true));
+            })
+            ->exists();
     }
 
     public function activePackageOptions(): HasMany

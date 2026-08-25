@@ -16,6 +16,7 @@ class WaitingList extends Model
         'customer_email',
         'status',
         'notified_at',
+        'hold_id',
     ];
 
     protected $casts = [

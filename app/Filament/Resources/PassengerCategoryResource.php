@@ -41,6 +41,12 @@ class PassengerCategoryResource extends Resource
         return 'مكتبة فئات التسعير';
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
+    }
+
     public static function form(Form $form): Form
     {
         return $form

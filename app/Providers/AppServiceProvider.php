@@ -7,6 +7,8 @@ use App\Models\Payment;
 use App\Models\Booking;
 use App\Observers\PaymentObserver;
 use App\Observers\BookingObserver;
+use App\Models\Passenger;
+use App\Observers\PassengerObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Payment::observe(PaymentObserver::class);
         Booking::observe(BookingObserver::class);
+        Passenger::observe(PassengerObserver::class);
 
         \Illuminate\Support\Facades\Gate::before(function ($user, $ability) {
             return $user->is_super_admin ? true : null;

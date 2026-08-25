@@ -35,6 +35,12 @@ class TripTemplateResource extends Resource
         return 'البرامج السياحية';
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -58,6 +64,12 @@ class TripTemplateResource extends Resource
                             ->required()
                             ->disabledOn('edit') // Rule: Cannot change currency easily once created
                             ->helperText('عملة الرحلة الأساسية. لا يمكن تغييرها لاحقاً إذا كان هناك حجوزات.'),
+
+                        Forms\Components\Select::make('trip_type')
+                            ->label('نوع الرحلة')
+                            ->options(\App\Enums\TripTypeEnum::class)
+                            ->nullable()
+                            ->helperText('تصنيف فقط لأغراض الفرز والتقارير — لا يؤثر على أي شروط أو خطوات حجز تلقائية.'),
                         Forms\Components\TextInput::make('base_price')
                             ->label('السعر الأساسي (الافتراضي)')
                             ->numeric()
@@ -270,6 +282,11 @@ class TripTemplateResource extends Resource
                 Tables\Columns\TextColumn::make('base_price')
                     ->label('السعر الأساسي')
                     ->money('USD')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('trip_type')
+                    ->label('نوع الرحلة')
+                    ->badge()
+                    ->placeholder('غير مصنف')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('تاريخ الإنشاء')

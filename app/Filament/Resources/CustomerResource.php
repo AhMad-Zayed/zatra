@@ -26,6 +26,13 @@ class CustomerResource extends Resource
     protected static ?string $navigationGroup = 'العمليات اليومية';
     protected static ?int $navigationSort = 3;
 
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'phone', 'email', 'identity_number'];
+    }
+
     public static function getNavigationLabel(): string
     {
         return 'العملاء';
@@ -39,6 +46,12 @@ class CustomerResource extends Resource
     public static function getPluralModelLabel(): string
     {
         return 'العملاء';
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
     }
 
     public static function form(Form $form): Form

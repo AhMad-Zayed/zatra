@@ -24,6 +24,7 @@ class TripTemplate extends Model implements HasMedia
         'tenant_id',
         'title',
         'currency',
+        'trip_type',
         'slug',
         'is_active',
         'description',
@@ -36,6 +37,7 @@ class TripTemplate extends Model implements HasMedia
 
     protected $casts = [
         'is_active' => 'boolean',
+        'trip_type' => \App\Enums\TripTypeEnum::class,
         'base_price' => \App\Casts\MoneyCast::class,
         'passenger_requirements' => 'array',
         'deposit_enabled' => 'boolean',

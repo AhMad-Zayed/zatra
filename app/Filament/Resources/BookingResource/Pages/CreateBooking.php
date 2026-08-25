@@ -62,13 +62,28 @@ class CreateBooking extends CreateRecord
         try {
             // Pass the UNIFIED payload array to the refactored Service
             $booking = $service->execute($data);
-            
-            if (isset($data['booking_status'])) {
-                $booking->update(['booking_status' => $data['booking_status']]);
+
+            // Bug fix: this used to let the admin form's booking_status field silently
+            // override whatever CreateBookingService::execute() had just derived from
+            // payment_type/deposit logic — an admin could mark a booking "Confirmed" with $0
+            // collected. booking_status is now left exactly as the service (and the payment
+            // observer chain) derives it, same as every other booking-creation path.
+
+            // Permissive requirement-preset check: never blocks admin-created bookings, but
+            // surfaces a warning so the creating admin knows documentation is still needed.
+            // CreateBookingService::execute() already computed and persisted each passenger's
+            // requirements_complete flag.
+            if ($summary = app(\App\Services\RequirementValidationService::class)->summarizeIncompletePassengers($booking)) {
+                Notification::make()
+                    ->warning()
+                    ->title('تنبيه: بيانات ناقصة')
+                    ->body($summary)
+                    ->persistent()
+                    ->send();
             }
-            
+
             return $booking;
-            
+
         } catch (InventoryExhaustedException $e) {
             Notification::make()
                 ->danger()
@@ -78,6 +93,12 @@ class CreateBooking extends CreateRecord
                 
             $this->halt();
         }
+    }
+
+    
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('view', ['record' => $this->record]);
     }
 
     protected function afterCreate(): void

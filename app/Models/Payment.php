@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Exception;
 
 class Payment extends Model
 {
@@ -15,6 +14,7 @@ class Payment extends Model
     protected $fillable = [
         'tenant_id',
         'booking_id',
+        'reversed_payment_id',
         'amount',
         'currency',
         'payment_method',
@@ -37,11 +37,11 @@ class Payment extends Model
         });
 
         static::updating(function ($model) {
-            throw new Exception("Payments are strictly immutable and cannot be updated.");
+            throw new \RuntimeException("Payments are strictly immutable and cannot be updated.");
         });
 
         static::deleting(function ($model) {
-            throw new Exception("Payments are strictly immutable and cannot be deleted.");
+            throw new \RuntimeException("Payments are strictly immutable and cannot be deleted.");
         });
     }
 

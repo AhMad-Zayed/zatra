@@ -1,0 +1,76 @@
+=== A01 ===
+ACCEPTED: pnr=ZTR-SANLQQ — Server did NOT enforce passport
+=== A02 ===
+SAVED future DOB: 2050-01-01 00:00:00
+=== T1 ===
+Test UUID: 6cfbcdc2-56bb-47d3-ae5d-aa0fbf342681 owner_customer_id=1
+=== T2 ===
+CustomerB booking UUID: 657b9372-32cd-42a2-b419-9444fb4ba947
+=== M ===
+Created booking PNR=ZTR-EIQKQB grand_total_raw=5000000
+M1: ACCEPTED zero payment (BUG)
+M2: ACCEPTED negative payment (BUG)
+M3: Partial payment accepted. total_paid=249500000 balance_due=0
+M4: Overpayment rejected: لقد تجاوزت الحد الأقصى لتسجيل الدفعات. يرجى الانتظار 60 ثانية.
+=== N ===
+Payment: id=1 amount=50000000 booking=ZAT-PAID-001
+IMMUTABILITY PASS: Payments are strictly immutable and cannot be updated.
+DELETE PROTECTED: Payments are strictly immutable and cannot be deleted.
+=== V ===
+DUPLICATE BOOKING CREATED: ZTR-21RG6K AND ZTR-7XJHE4 (BUG-005 CONFIRMED)
+=== U1 ===
+Booking::first() - tenant_id=1 id=1
+withoutGlobalScopes()->find() - same result? YES (no isolation)
+Booking::all() returns tenants: 1
+ (multiple tenants = isolation broken if >1)
+=== U2 ===
+InventoryLedger tenant_id accessible: NO (BUG-003)
+=== W ===
+Orphan passengers: 0
+CANCELLED BOOKINGS LEAKING SEATS: 
+ZTR-OMPCLS net=-1
+OVERPAID: ZAT-PEND-002 grand=500000 paid=20000000
+OVERPAID: ZTR-EIQKQB grand=5000000 paid=249500000
+=== ADD ===
+BookingService has addPassenger: NO
+BookingService has addSeats: NO
+BookingResource has add_seats action: YES
+cancelBooking method: 
+public function cancelBooking(Booking $booking, ?string $reason = null): void
+    {
+        DB::transaction(function () use ($booking, $reason) {
+            $oldStatus = $booking->booking_status;
+            
+            // Bypass observers
+            DB::table('bookings')
+                ->where('id', $booking->id)
+                ->update(['booking_status' => BookingStatus::Cancelled->value]);
+
+            // Release inventory (seats)
+            $seatsToRelease = \App\Models\Passenger::where('booking_id', $booking->id)
+                ->whereHas('tripPassengerCategory', function($q) {
+                    $q->where('requires_seat', true);
+                })->count();
+
+            if ($seatsToRelease > 0) {
+                \App\Models\InventoryLedger::create([
+                    'trip_instance_id' => $booking->trip_instance_id,
+                    'quantity' => $seatsToRelease,
+                    'type' => 'cancelled',
+                ]);
+            }
+
+            activity()
+                ->performedOn($booking)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'old_status' => $oldStatus?->value,
+                    'new_status' => BookingStatus::Cancelled->value,
+                    'reason' => $reason,
+                ])
+                ->log('booking_cancelled');
+
+            // Dispatch waitlist auto-promotion
+            \App\Jobs\WaitlistAutoPromotion::dispatch($booking->trip_instance_id);
+        });
+    }

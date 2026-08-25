@@ -24,6 +24,7 @@ class Booking extends Model implements HasMedia
         'customer_id',
         'user_id',
         'pnr',
+        'idempotency_key',
         'currency',
         'uuid',
         'booking_status',
@@ -118,6 +119,14 @@ class Booking extends Model implements HasMedia
     public function packageOption(): BelongsTo
     {
         return $this->belongsTo(PackageOption::class);
+    }
+
+    // Hotel/Rooming redesign Ticket 2 — built alongside packageOption() above, not replacing
+    // it. A booking uses one system or the other in practice (whichever the trip instance has
+    // configured), never both; nothing here enforces that exclusivity at the DB level.
+    public function roomSelections(): HasMany
+    {
+        return $this->hasMany(BookingRoomSelection::class);
     }
 
     public function user(): BelongsTo

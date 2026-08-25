@@ -107,4 +107,12 @@ class Tenant extends Model implements HasMedia
     {
         return $this->hasMany(RequirementPreset::class);
     }
+
+    // Hotel/Rooming redesign Phase 1 — required for Filament's native panel tenancy to
+    // auto-assign tenant_id on create for HotelResource, matching every other top-level
+    // tenant-scoped resource's identical relation here.
+    public function hotels(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Hotel::class);
+    }
 }

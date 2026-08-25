@@ -310,6 +310,45 @@
                         @endforelse
                     </div>
 
+                    {{-- Hotel/Rooming redesign Ticket 2 — minimal quantity-stepper UI, gated by
+                         the kill switch (tenants.settings['room_booking_enabled'] + catalog data,
+                         combined in TripInstance::room_booking_is_available). A richer visual
+                         room picker is a future ticket; this proves the backend integration. --}}
+                    @if($roomBookingAvailable && $this->availableRoomTypes->isNotEmpty())
+                        <div class="mt-10 pt-6 border-t border-slate-100">
+                            <p class="text-xs text-slate-400 font-bold mb-3">اختر الغرف (اختياري)</p>
+                            <div class="space-y-3">
+                                @foreach($this->availableRoomTypes as $row)
+                                    @php($roomType = $row['room_type'])
+                                    <div class="flex flex-wrap items-center gap-4 p-4 rounded-2xl border border-slate-200">
+                                        <div class="flex-1 min-w-[200px]">
+                                            <span class="font-bold text-zatara-blue text-sm">{{ $roomType->name }}</span>
+                                            <p class="text-xs text-slate-400 mt-0.5">
+                                                {{ $row['hotel_option_label'] }}
+                                                @if($row['leg_label']) &middot; {{ $row['leg_label'] }} @endif
+                                            </p>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-xs text-slate-500">العدد</label>
+                                            <input type="number" min="0"
+                                                   wire:change="updateRoomSelectionQuantity({{ $roomType->id }}, $event.target.value)"
+                                                   value="{{ $roomSelections[$roomType->id]['quantity'] ?? 0 }}"
+                                                   class="glass-input w-20 px-3 py-2 text-sm">
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <label class="text-xs text-slate-500">الإشغال</label>
+                                            <select wire:change="updateRoomSelectionOccupancy({{ $roomType->id }}, $event.target.value)"
+                                                    class="glass-input px-3 py-2 text-sm">
+                                                <option value="shared" @selected(($roomSelections[$roomType->id]['occupancy_type'] ?? 'shared') === 'shared')>مشاركة</option>
+                                                <option value="single" @selected(($roomSelections[$roomType->id]['occupancy_type'] ?? 'shared') === 'single')>فردي</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="flex justify-between pt-6 border-t border-slate-100 mt-10">
                         <button type="button" wire:click="$set('currentStep', 2)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">
                             السابق
@@ -483,7 +522,7 @@
                         <button type="button" wire:click="$set('currentStep', 3)" class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 rounded-2xl transition-all disabled:opacity-50" wire:loading.attr="disabled">
                             تراجع
                         </button>
-                        <button type="submit" class="btn-secondary px-10 py-4 text-lg flex items-center justify-center gap-2 relative disabled:opacity-75" wire:loading.attr="disabled" wire:target="submitBooking">
+                        <button type="submit" class="btn-secondary px-10 py-4 text-lg flex items-center justify-center gap-2 relative disabled:opacity-75" wire:loading.attr="disabled" wire:loading.class="opacity-50 cursor-not-allowed" wire:target="submitBooking">
                             <span wire:loading.remove wire:target="submitBooking" class="flex items-center justify-center gap-2">
                                 <span>تأكيد الحجز الآن</span>
                                 <span class="material-symbols-outlined">check_circle</span>

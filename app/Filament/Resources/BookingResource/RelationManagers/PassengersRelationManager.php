@@ -115,6 +115,15 @@ class PassengersRelationManager extends RelationManager
                     ->falseColor('warning')
                     ->tooltip(fn ($state) => $state ? 'بيانات مكتملة' : 'بيانات ناقصة (حجز سريع)'),
 
+                IconColumn::make('requirements_complete')
+                    ->label('المتطلبات')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-shield-check')
+                    ->falseIcon('heroicon-o-shield-exclamation')
+                    ->trueColor('success')
+                    ->falseColor('danger')
+                    ->tooltip(fn ($state) => $state ? 'مستوفي لمتطلبات الرحلة' : 'ناقص أحد متطلبات الرحلة (وثيقة/صورة)'),
+
                 TextColumn::make('document_type')
                     ->label('نوع الوثيقة')
                     ->formatStateUsing(fn ($state) => match ($state) {
@@ -131,7 +140,10 @@ class PassengersRelationManager extends RelationManager
                     ->placeholder('—'),
             ])
             ->filters([
-                //
+                Tables\Filters\TernaryFilter::make('requirements_complete')
+                    ->label('مستوفي متطلبات الرحلة؟')
+                    ->trueLabel('مستوفي')
+                    ->falseLabel('ناقص'),
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()

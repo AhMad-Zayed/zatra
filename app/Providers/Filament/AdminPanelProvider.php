@@ -29,9 +29,11 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->unsavedChangesAlerts()
             ->colors([
                 'primary' => Color::Amber,
             ])
+            ->font('Tajawal')
             ->tenant(Tenant::class)
             ->tenantProfile(\App\Filament\Pages\Tenancy\EditTenantProfile::class)
             ->tenantMiddleware([
@@ -43,12 +45,12 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->navigationGroups([
-                \Filament\Navigation\NavigationGroup::make('لوحة القيادة')->icon('heroicon-o-home')->collapsible(false),
-                \Filament\Navigation\NavigationGroup::make('العمليات اليومية')->icon('heroicon-o-bolt')->collapsible(false),
-                \Filament\Navigation\NavigationGroup::make('إدارة الرحلات')->icon('heroicon-o-map')->collapsible(false),
-                \Filament\Navigation\NavigationGroup::make('الحجوزات والعملاء')->icon('heroicon-o-ticket')->collapsible(false),
-                \Filament\Navigation\NavigationGroup::make('المالية')->icon('heroicon-o-banknotes')->collapsible(false),
-                \Filament\Navigation\NavigationGroup::make('الإعدادات والإدارة')->icon('heroicon-o-cog')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('لوحة القيادة')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('العمليات اليومية')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('إدارة الرحلات')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('الحجوزات والعملاء')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('المالية')->collapsible(false),
+                \Filament\Navigation\NavigationGroup::make('الإعدادات والإدارة')->collapsible(false),
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([

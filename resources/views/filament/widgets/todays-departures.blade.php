@@ -63,12 +63,13 @@
                             </p>
                         </div>
 
-                        {{-- Unpaid warning --}}
+                        {{-- Unpaid warning (clickable) --}}
                         @if($dep['unpaid_count'] > 0)
-                            <div class="flex items-center gap-2 text-xs bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg mb-3 border border-red-100 dark:border-red-800">
+                            <a href="{{ App\Filament\Resources\BookingResource::getUrl('index') }}?tableFilters[trip_instance_id][value]={{ $dep['id'] }}" 
+                               class="flex items-center gap-2 text-xs bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg mb-3 border border-red-100 dark:border-red-800 hover:bg-red-100 transition-colors">
                                 <x-heroicon-s-exclamation-triangle class="w-4 h-4 flex-shrink-0"/>
-                                <span>{{ $dep['unpaid_count'] }} حجز غير مدفوع</span>
-                            </div>
+                                <span>{{ $dep['unpaid_count'] }} حجز قيد الدفع (اضغط للمراجعة)</span>
+                            </a>
                         @endif
 
                         {{-- Manifest link --}}

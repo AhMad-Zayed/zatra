@@ -30,12 +30,18 @@ class ReleaseWaitlistHold implements ShouldQueue
         $waitlist = \App\Models\WaitingList::find($this->waitlistId);
 
         if ($hold && $hold->type === 'hold') {
-            // It expired. Release it by expiring or deleting it.
-            $hold->update([
-                'type' => 'expired',
-            ]);
+            // It expired. Release it using DB::table() to bypass the immutability observer
+            // (intentional internal operation — not an external mutation)
+            \Illuminate\Support\Facades\DB::table('inventory_ledgers')
+                ->where('id', $hold->id)
+                ->where('type', 'hold') // safety: only expire actual holds
+                ->update(['type' => 'expired']);
 
-            if ($waitlist) {
+            // Bug fix: this used to unconditionally overwrite status to Expired, even when the
+            // customer had already successfully redeemed this exact hold and converted it into
+            // a booking (status already Converted) — an admin could watch a successful
+            // conversion silently revert to "Expired" in the waiting-list table hours later.
+            if ($waitlist && $waitlist->status !== \App\Enums\WaitingListStatusEnum::Converted) {
                 $waitlist->update(['status' => \App\Enums\WaitingListStatusEnum::Expired]);
             }
 

@@ -257,6 +257,37 @@ class QuickBookingPage extends Page implements HasForms
                 'payment_type'    => 'full',
             ]);
 
+            // Bug fix: this step's payment-method selection previously had no effect — no
+            // Payment row was ever created, leaving an agent who picked "cash" believing they'd
+            // recorded a payment when the booking was actually left fully unpaid. payment_type
+            // is already hardcoded to 'full' above, so record the booking's full grand_total
+            // against the method actually selected.
+            $grandTotal = (float) $booking->grand_total;
+            if ($grandTotal > 0) {
+                app(\App\Services\BookingService::class)->recordPayment(
+                    $booking,
+                    $grandTotal,
+                    $this->payment_method,
+                    auth()->user(),
+                    \App\Enums\PaymentType::FULL,
+                    null,
+                    $booking->currency
+                );
+            }
+
+            // Permissive requirement-preset check: never blocks staff bookings, but surfaces a
+            // warning so the agent knows documentation still needs collecting.
+            // CreateBookingService::execute() already computed and persisted each passenger's
+            // requirements_complete flag — this just reports what it found.
+            if ($summary = app(\App\Services\RequirementValidationService::class)->summarizeIncompletePassengers($booking)) {
+                Notification::make()
+                    ->warning()
+                    ->title('تنبيه: بيانات ناقصة')
+                    ->body($summary)
+                    ->persistent()
+                    ->send();
+            }
+
             $this->pnr        = $booking->pnr;
             $this->booking_id = $booking->id;
             $this->currentStep = 5;

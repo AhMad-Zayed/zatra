@@ -21,17 +21,17 @@ class TripInstanceResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return 'مواعيد الرحلات المجدولة';
+        return 'الرحلات المجدولة';
     }
 
     public static function getModelLabel(): string
     {
-        return 'موعد رحلة';
+        return 'رحلة مجدولة';
     }
 
     public static function getPluralModelLabel(): string
     {
-        return 'المواعيد المجدولة';
+        return 'الرحلات المجدولة';
     }
 
     // Navigation group — matches TripBuilderResource
@@ -114,7 +114,6 @@ class TripInstanceResource extends Resource
                             ->options([
                                 'active' => 'نشط',
                                 'completed' => 'مكتملة',
-                                'cancelled' => 'ملغية',
                             ])
                             ->required()
                             ->default('active'),
@@ -208,6 +207,12 @@ class TripInstanceResource extends Resource
                     ->label('البرنامج السياحي')
                     ->searchable()
                     ->sortable(),
+                // Read through the template relation — trip_type is a template-level
+                // classification field only, not duplicated onto trip_instances.
+                Tables\Columns\TextColumn::make('tripTemplate.trip_type')
+                    ->label('نوع الرحلة')
+                    ->badge()
+                    ->placeholder('غير مصنف'),
                 Tables\Columns\TextColumn::make('start_date')
                     ->label('تاريخ الذهاب')
                     ->date()
@@ -241,6 +246,12 @@ class TripInstanceResource extends Resource
                     ->badge()
                     ->color('success')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('active_passengers_count')
+                    ->label('عدد المسافرين')
+                    ->counts('activePassengers')
+                    ->badge()
+                    ->color('info')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('الحالة')
                     ->badge()
@@ -257,6 +268,7 @@ class TripInstanceResource extends Resource
                     })
                     ->sortable(),
             ])
+            ->defaultSort('start_date', 'asc')
             ->filters([
                 // HIGH-004: TripInstanceResource had empty filters — now fully functional
                 Tables\Filters\SelectFilter::make('status')
@@ -279,6 +291,13 @@ class TripInstanceResource extends Resource
                 Tables\Filters\Filter::make('has_available_seats')
                     ->label('بها مقاعد متاحة')
                     ->query(fn (Builder $query) => $query->whereHas('tripPassengerCategories')),
+                Tables\Filters\SelectFilter::make('trip_type')
+                    ->label('نوع الرحلة')
+                    ->options(\App\Enums\TripTypeEnum::class)
+                    ->query(fn (Builder $query, array $data) => $query->when(
+                        $data['value'] ?? null,
+                        fn (Builder $q, $value) => $q->whereHas('tripTemplate', fn (Builder $q2) => $q2->where('trip_type', $value))
+                    )),
             ])
             ->actions([
                 Tables\Actions\Action::make('generate_manifest')
@@ -390,6 +409,51 @@ class TripInstanceResource extends Resource
                             ->send();
                     }),
                     
+                Tables\Actions\Action::make('cancel_trip')
+                    ->label('إلغاء الرحلة')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->visible(fn (TripInstance $record): bool =>
+                        !in_array($record->status, [
+                            \App\Enums\TripStatusEnum::Cancelled,
+                            \App\Enums\TripStatusEnum::Completed,
+                            \App\Enums\TripStatusEnum::InProgress,
+                        ], true) &&
+                        auth()->user()?->hasRole('agency_admin')
+                    )
+                    ->requiresConfirmation()
+                    ->modalHeading('تأكيد إلغاء الرحلة')
+                    ->modalDescription('سيتم إلغاء الرحلة وجميع الحجوزات المرتبطة بها وإشعار العملاء. هذا الإجراء لا يمكن التراجع عنه.')
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalIconColor('danger')
+                    ->form([
+                        Forms\Components\Textarea::make('reason')
+                            ->label('سبب الإلغاء (سيظهر للعملاء)')
+                            ->required()
+                            ->rows(3)
+                            ->placeholder('مثال: ظروف طارئة، عدم اكتمال العدد...'),
+                    ])
+                    ->action(function (TripInstance $record, array $data): void {
+                        try {
+                            $count = app(\App\Services\TripService::class)->cancelTrip(
+                                $record,
+                                $data['reason'] ?? ''
+                            );
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('تم إلغاء الرحلة بنجاح')
+                                ->body("تم إلغاء {$count} حجز وإشعار العملاء.")
+                                ->success()
+                                ->send();
+                        } catch (\Throwable $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('فشل إلغاء الرحلة')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
+
                 Tables\Actions\EditAction::make(),
                 // SEC-002: Restrict trip delete to agency_admin only (trips can have live bookings)
                 Tables\Actions\DeleteAction::make()
@@ -425,7 +489,16 @@ class TripInstanceResource extends Resource
                         ->form([
                             Forms\Components\Select::make('new_status')
                                 ->label('الحالة الجديدة')
-                                ->options(\App\Enums\TripStatusEnum::class)
+                                // Cancelled is deliberately excluded: cancellation must only
+                                // happen through the cancel_trip action, which cascades to
+                                // bookings (inventory release, refund-liability tracking,
+                                // notification). This bulk action does a bare status update
+                                // with no cascade at all.
+                                ->options(
+                                    collect(\App\Enums\TripStatusEnum::cases())
+                                        ->reject(fn ($c) => $c === \App\Enums\TripStatusEnum::Cancelled)
+                                        ->mapWithKeys(fn ($c) => [$c->value => $c->getLabel()])
+                                )
                                 ->required(),
                         ])
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records, array $data) {
@@ -447,6 +520,9 @@ class TripInstanceResource extends Resource
             RelationManagers\TripPassengersRelationManager::class,
             RelationManagers\WaitingListsRelationManager::class,
             RelationManagers\PackageOptionsRelationManager::class,
+            // Hotel/Rooming redesign Phase 1 — additive, alongside PackageOptionsRelationManager
+            // above (which stays fully live and untouched; see Ticket 1 investigation report).
+            RelationManagers\TripStayLegsRelationManager::class,
         ];
     }
 

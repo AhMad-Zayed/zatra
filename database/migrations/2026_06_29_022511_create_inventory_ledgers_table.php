@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('booking_id')->nullable()->constrained('bookings')->nullOnDelete();
             $table->integer('quantity');
             $table->enum('type', ['initial_stock', 'hold', 'confirmed', 'cancelled', 'expired']);
+            $table->text('notes')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
         });

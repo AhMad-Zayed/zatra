@@ -25,7 +25,14 @@ class CheckoutWizard extends Component
     public Tenant $tenant;
     public ?\App\Models\PackageOption $packageOption = null;
     public ?int $selectedPackageId = null;
-    
+
+    // Hotel/Rooming redesign Ticket 2 — built alongside the PackageOption properties above, not
+    // replacing them. UI-level kill-switch gate: computed once in mount() from
+    // TripInstance::room_booking_is_available (tenant setting + catalog data both required).
+    // roomSelections shape: [room_type_id => ['quantity' => int, 'occupancy_type' => 'shared'|'single']].
+    public bool $roomBookingAvailable = false;
+    public array $roomSelections = [];
+
     public BookingForm $form;
     
     public int $currentStep = 1;
@@ -33,9 +40,16 @@ class CheckoutWizard extends Component
     public $paymentType = 'full';
     public $booking_id = null;
     public $wl_id = null; // Waiting List ID for conversion hook
+    public string $idempotencyKey = '';
 
     public function mount(Tenant $tenant, TripInstance $tripInstance)
     {
+        $this->idempotencyKey = md5(
+            session()->getId() . '_' .
+            ($tripInstance->id ?? 'unknown') . '_' .
+            now()->format('YmdH')
+        );
+
         if ($tripInstance->remaining_seats <= 0) {
             session()->flash('error', 'نأسف، لقد بيعت جميع مقاعد هذه الرحلة بالكامل.');
             $this->redirect(route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $tripInstance->tripTemplate->slug]), navigate: true);
@@ -44,6 +58,14 @@ class CheckoutWizard extends Component
 
         $this->tripInstance = $tripInstance->load('tripPassengerCategories', 'tripAddons', 'pickupRoutes.pickupPoints');
         $this->tenant = $tripInstance->tenant;
+
+        // Hotel/Rooming redesign Ticket 2 — UI-level kill-switch gate (belt-and-suspenders with
+        // the backend gate in CreateBookingService::execute()). Computed once here rather than
+        // per-render, since the underlying tenant setting/catalog data doesn't change mid-request.
+        $this->roomBookingAvailable = $this->tripInstance->room_booking_is_available;
+        if ($this->roomBookingAvailable) {
+            $this->tripInstance->load('tripStayLegs.hotelOptions.roomTypes');
+        }
         
         // Pass the trip instance ID to the form for strict validation scoping
         $this->form->setTripInstanceId($this->tripInstance->id);
@@ -114,12 +136,96 @@ class CheckoutWizard extends Component
         return null;
     }
 
+    // Hotel/Rooming redesign Ticket 2 — flat list across all legs/hotel options, each item
+    // carrying its leg/hotel label for display. Deliberately minimal (a labeled quantity
+    // stepper list, not a per-leg wizard step or a visual room picker) — the approved Ticket 2
+    // scope for this UI.
+    #[Livewire\Attributes\Computed]
+    public function getAvailableRoomTypesProperty()
+    {
+        if (!$this->roomBookingAvailable) {
+            return collect();
+        }
+
+        $rows = collect();
+        foreach ($this->tripInstance->tripStayLegs as $leg) {
+            foreach ($leg->hotelOptions as $option) {
+                if (!$option->is_active) {
+                    continue;
+                }
+                foreach ($option->roomTypes as $roomType) {
+                    if (!$roomType->is_active) {
+                        continue;
+                    }
+                    $rows->push([
+                        'room_type' => $roomType,
+                        'leg_label' => $leg->label,
+                        'hotel_option_label' => $option->label ?? $option->hotel?->name,
+                    ]);
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    public function updateRoomSelectionQuantity(int $roomTypeId, int $quantity): void
+    {
+        $quantity = max(0, $quantity);
+
+        if ($quantity === 0) {
+            unset($this->roomSelections[$roomTypeId]);
+            return;
+        }
+
+        $this->roomSelections[$roomTypeId]['quantity'] = $quantity;
+        $this->roomSelections[$roomTypeId]['occupancy_type'] ??= 'shared';
+    }
+
+    public function updateRoomSelectionOccupancy(int $roomTypeId, string $occupancyType): void
+    {
+        if (!isset($this->roomSelections[$roomTypeId])) {
+            return;
+        }
+        $this->roomSelections[$roomTypeId]['occupancy_type'] = $occupancyType === 'single' ? 'single' : 'shared';
+    }
+
+    // Mirrors CreateBookingService/RoomInventoryService's pricing formula exactly, for display
+    // only — the server independently recomputes and is the source of truth at booking time.
+    private function estimateRoomCharges(): float
+    {
+        if (!$this->roomBookingAvailable || empty($this->roomSelections)) {
+            return 0.0;
+        }
+
+        $roomTypesById = $this->availableRoomTypes->pluck('room_type')->keyBy('id');
+        $total = 0.0;
+
+        foreach ($this->roomSelections as $roomTypeId => $selection) {
+            $roomType = $roomTypesById->get($roomTypeId);
+            if (!$roomType || empty($selection['quantity'])) {
+                continue;
+            }
+
+            $perRoom = (float) $roomType->price_adjustment_shared;
+            if (($selection['occupancy_type'] ?? 'shared') === 'single') {
+                $perRoom += (float) $roomType->price_adjustment_single_supplement;
+            } else {
+                $perRoom *= $roomType->capacity_per_room;
+            }
+
+            $total += $perRoom * (int) $selection['quantity'];
+        }
+
+        return $total;
+    }
+
     #[Livewire\Attributes\Computed]
     public function getGrandTotalProperty()
     {
         $total = 0;
         $overrideAmount = $this->tripInstance->price_override ? $this->tripInstance->price_override_amount : 0;
-        
+
         $categories = $this->tripInstance->tripPassengerCategories->keyBy('id');
         foreach ($this->form->passengers as $p) {
             $tierId = $p['trip_passenger_category_id'] ?? null;
@@ -127,7 +233,7 @@ class CheckoutWizard extends Component
                 $total += ($categories[$tierId]->price + $overrideAmount);
             }
         }
-        
+
         $addons = $this->tripInstance->tripAddons->keyBy('id');
         foreach ($this->form->addons as $a) {
             $addonId = $a['trip_addon_id'] ?? null;
@@ -135,11 +241,13 @@ class CheckoutWizard extends Component
                 $total += ($addons[$addonId]->price * ($a['quantity'] ?? 1));
             }
         }
-        
+
         if ($this->packageOption) {
             $total += $this->packageOption->price_adjustment;
         }
-        
+
+        $total += $this->estimateRoomCharges();
+
         return max(0, $total);
     }
 
@@ -184,12 +292,44 @@ class CheckoutWizard extends Component
         // Call InventoryLedger to create a hold
         // The hold needs a quantity. Initially we might just hold 1 seat, or the number of passengers they currently have.
         $seatsToHold = count($this->form->passengers);
-        $hold = \App\Models\InventoryLedger::create([
-            'trip_instance_id' => $this->tripInstance->id,
-            'quantity' => -$seatsToHold,
-            'type' => 'hold',
-            'expires_at' => now()->addMinutes(15),
-        ]);
+
+        // Bug fix: a customer arriving via a waitlist redemption link (?wl=) used to always get
+        // a second, independent hold here — the waitlist's own hold (created by
+        // WaitlistAutoPromotion or the admin "send link now" action) was never reused or
+        // released, so this trip briefly double-counted the same seats as held. If that waitlist
+        // hold is still live, reuse it (re-stamping its expiry to match this guest session's own
+        // 15-minute window) instead of creating a new one; submitPassengers() already resizes
+        // whichever hold ends up on the guest session to match the real passenger count once
+        // it's known. InventoryLedger rows are immutable via Eloquent (see the model's
+        // `updating` guard), so — same as submitPassengers()/extendTimer() elsewhere in this
+        // class — the resize below goes through the query builder, not $hold->update().
+        $hold = null;
+        if ($this->wl_id) {
+            $waitingList = \App\Models\WaitingList::find($this->wl_id);
+            if ($waitingList && $waitingList->hold_id) {
+                $hold = \App\Models\InventoryLedger::where('id', $waitingList->hold_id)
+                    ->where('trip_instance_id', $this->tripInstance->id)
+                    ->where('type', 'hold')
+                    ->where(function ($q) {
+                        $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    })
+                    ->first();
+
+                if ($hold) {
+                    \App\Models\InventoryLedger::where('id', $hold->id)
+                        ->update(['expires_at' => now()->addMinutes(15)]);
+                }
+            }
+        }
+
+        if (!$hold) {
+            $hold = \App\Models\InventoryLedger::create([
+                'trip_instance_id' => $this->tripInstance->id,
+                'quantity' => -$seatsToHold,
+                'type' => 'hold',
+                'expires_at' => now()->addMinutes(15),
+            ]);
+        }
 
         $guestSession->update(['hold_id' => $hold->id]);
 
@@ -278,6 +418,27 @@ class CheckoutWizard extends Component
         // 3. Final Form Validation (Ensures tiers/addons belong to this trip)
         $this->form->validate();
 
+        // Requirement-preset pre-check — STRICT for customer self-checkout, text/date items
+        // only. No document-image upload exists in this checkout form (only the post-booking
+        // CustomerBookingPortal flow can collect one), so image-type items are never blocked
+        // here; CreateBookingService::execute() still tags each passenger's
+        // requirements_complete against ALL item types (including image) regardless of this
+        // check's outcome, so an outstanding image requirement remains visible to staff even
+        // though checkout itself succeeded.
+        $requirementPreset = $this->tripInstance->tripTemplate->requirementPreset;
+        $requirementService = app(\App\Services\RequirementValidationService::class);
+        $missingRequirements = $requirementService->findMissingRequirements($requirementPreset, $this->form->passengers);
+        $blockingMisses = $requirementService->blockingMisses($missingRequirements);
+
+        if (!empty($blockingMisses)) {
+            foreach ($blockingMisses as $miss) {
+                $field = $miss['type'] === 'date' ? 'date_of_birth' : 'document_number';
+                $this->form->addError("passengers.{$miss['passenger_index']}.{$field}", "{$miss['label']} مطلوب لإتمام الحجز.");
+            }
+            $this->currentStep = 2;
+            return;
+        }
+
         try {
             // Calculate total amount to find deposit if applicable
             $grandTotal = 0;
@@ -311,6 +472,26 @@ class CheckoutWizard extends Component
                 $depositAmount = ($grandTotal * $percentage) / 100;
             }
 
+            // Hotel/Rooming redesign Ticket 2 — UI-level kill-switch gate: send an empty array
+            // whenever $roomBookingAvailable is false, regardless of any stray client-side
+            // state, so a disabled feature genuinely sends nothing. CreateBookingService::execute()
+            // independently re-checks the tenant setting itself either way (backend gate,
+            // belt-and-suspenders — this UI-level gate is not the only thing standing between a
+            // disabled switch and a consumed room).
+            $roomSelectionsPayload = [];
+            if ($this->roomBookingAvailable) {
+                foreach ($this->roomSelections as $roomTypeId => $selection) {
+                    if (empty($selection['quantity'])) {
+                        continue;
+                    }
+                    $roomSelectionsPayload[] = [
+                        'room_type_id' => (int) $roomTypeId,
+                        'quantity' => (int) $selection['quantity'],
+                        'occupancy_type' => $selection['occupancy_type'] ?? 'shared',
+                    ];
+                }
+            }
+
             // Compile Unified Payload Array (DTO format)
             $payload = [
                 'tenant_id' => $this->tenant->id,
@@ -322,8 +503,10 @@ class CheckoutWizard extends Component
                 'package_option_id' => $this->selectedPackageId,
                 'passengersData' => $this->form->passengers,
                 'addonsData' => $this->form->addons,
+                'room_selections' => $roomSelectionsPayload,
                 'payment_type' => $this->paymentType,
                 'deposit_amount' => $depositAmount,
+                'idempotency_key' => $this->idempotencyKey,
                 'notes' => null,
             ];
 

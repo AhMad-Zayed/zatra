@@ -10,6 +10,8 @@ enum PaymentStatus: string implements HasLabel, HasColor
     case Unpaid = 'unpaid';
     case PartiallyPaid = 'partially_paid';
     case Paid = 'paid';
+    case RefundPending = 'refund_pending';
+    case Refunded = 'refunded';
 
     public function getLabel(): ?string
     {
@@ -17,6 +19,8 @@ enum PaymentStatus: string implements HasLabel, HasColor
             self::Unpaid => 'غير مدفوع',
             self::PartiallyPaid => 'مدفوع جزئياً',
             self::Paid => 'مدفوع',
+            self::RefundPending => 'بانتظار الاسترداد',
+            self::Refunded => 'تم الاسترداد',
         };
     }
 
@@ -26,6 +30,8 @@ enum PaymentStatus: string implements HasLabel, HasColor
             self::Unpaid => 'danger',
             self::PartiallyPaid => 'warning',
             self::Paid => 'success',
+            self::RefundPending => 'warning',
+            self::Refunded => 'gray',
         };
     }
 }

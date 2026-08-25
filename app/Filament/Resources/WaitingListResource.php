@@ -23,6 +23,12 @@ class WaitingListResource extends Resource
     protected static ?string $navigationGroup = 'الحجوزات والعملاء';
     protected static ?int $navigationSort = 4;
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
+    }
+
     public static function form(Form $form): Form
     {
         return $form

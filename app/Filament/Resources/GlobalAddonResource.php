@@ -41,6 +41,12 @@ class GlobalAddonResource extends Resource
         return 'مكتبة الإضافات';
     }
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
+    }
+
     public static function form(Form $form): Form
     {
         return $form

@@ -24,7 +24,10 @@ class CustomerBookingPortal extends Component
     
     public $availableSeats = [];
     public $selectedSeats = [];
-    public $totalSeats = 50;
+    // null = trip has no fixed seat map (TripInstance::available_seats is null, meaning
+    // unlimited capacity per TripInstance::getRemainingSeatsAttribute()'s own convention).
+    // Numbered seat selection is skipped entirely in that case rather than guessed at.
+    public $totalSeats = null;
     
     public $isCancelled = false;
     public $isExpired = false;
@@ -32,9 +35,16 @@ class CustomerBookingPortal extends Component
     public function mount($uuid)
     {
         $this->uuid = $uuid;
-        $this->booking = Booking::where('uuid', $uuid)
-            ->with(['passengers.tripPassengerCategory', 'tripInstance.tripTemplate.requirementPreset', 'tenant'])
-            ->firstOrFail();
+        $customerId = \Illuminate\Support\Facades\Auth::guard('customer')->id();
+
+        $query = Booking::where('uuid', $uuid)
+            ->with(['passengers.tripPassengerCategory', 'tripInstance.tripTemplate.requirementPreset', 'tenant']);
+            
+        if ($customerId) {
+            $query->where('customer_id', $customerId);
+        }
+        
+        $this->booking = $query->firstOrFail();
             
         $this->currentTenant = $this->booking->tenant;
         \Illuminate\Support\Facades\View::share('currentTenant', $this->currentTenant);
@@ -68,15 +78,28 @@ class CustomerBookingPortal extends Component
             }
         }
         
-        $this->totalSeats = $this->booking->tripInstance->seats_count ?? 50;
-        $takenSeats = Passenger::whereHas('booking', fn($q) => $q->where('trip_instance_id', $this->booking->trip_instance_id))
-            ->where('booking_id', '!=', $this->booking->id)
-            ->whereNotNull('seat_number')
-            ->pluck('seat_number')
-            ->toArray();
-            
-        for ($i = 1; $i <= $this->totalSeats; $i++) {
-            $this->availableSeats[$i] = !in_array((string)$i, $takenSeats);
+        // Bug fix: this used to read a `seats_count` column that does not exist anywhere in
+        // the schema (always null), silently falling back to a hardcoded 50-seat grid
+        // completely disconnected from the trip's real capacity. `available_seats` is the
+        // actual capacity column — the same field InventoryService/
+        // TripInstance::getRemainingSeatsAttribute() use as their base for every other seat
+        // calculation in the app. Total capacity (not the live remaining count) is the correct
+        // bound for a numbered seat grid: the grid must stay a stable size so a seat number
+        // already assigned to a passenger doesn't fall outside the range as the trip fills up.
+        // Which specific numbered seats are taken is tracked separately below, from other
+        // passengers' actual seat_number assignments — that part was already correct.
+        $this->totalSeats = $this->booking->tripInstance->available_seats;
+
+        if ($this->totalSeats !== null) {
+            $takenSeats = Passenger::whereHas('booking', fn($q) => $q->where('trip_instance_id', $this->booking->trip_instance_id))
+                ->where('booking_id', '!=', $this->booking->id)
+                ->whereNotNull('seat_number')
+                ->pluck('seat_number')
+                ->toArray();
+
+            for ($i = 1; $i <= $this->totalSeats; $i++) {
+                $this->availableSeats[$i] = !in_array((string)$i, $takenSeats);
+            }
         }
     }
     
@@ -98,7 +121,7 @@ class CustomerBookingPortal extends Component
     
     public function selectSeat($passengerId, $seatNumber)
     {
-        if (!$this->availableSeats[$seatNumber]) return;
+        if (empty($this->availableSeats[$seatNumber])) return;
         
         // Remove seat from other passengers in this booking if they had it
         foreach ($this->selectedSeats as $pid => $seat) {
@@ -114,30 +137,41 @@ class CustomerBookingPortal extends Component
     {
         $rules = [];
         $messages = [];
-        
+
         foreach ($this->booking->passengers as $p) {
             $rules["passengersData.{$p->id}.first_name"] = 'required|string|max:255';
             $rules["passengersData.{$p->id}.last_name"] = 'required|string|max:255';
             $messages["passengersData.{$p->id}.first_name.required"] = 'الاسم الأول مطلوب للراكب ' . $p->passenger_label;
             $messages["passengersData.{$p->id}.last_name.required"] = 'اسم العائلة مطلوب للراكب ' . $p->passenger_label;
-            
-            if (in_array('date_of_birth', $this->requirements)) {
-                $rules["passengersData.{$p->id}.date_of_birth"] = 'required|date';
-                $messages["passengersData.{$p->id}.date_of_birth.required"] = 'تاريخ الميلاد مطلوب';
-            }
-            if (in_array('document_number', $this->requirements)) {
-                $rules["passengersData.{$p->id}.document_number"] = 'required|string';
-                $messages["passengersData.{$p->id}.document_number.required"] = 'رقم الوثيقة مطلوب';
-            }
-            if (in_array('passport_image', $this->requirements)) {
-                // If not already has media, require upload
-                if (!$p->hasMedia('identity_documents')) {
-                    $rules["passengersData.{$p->id}.passport_file"] = 'required|image|max:5120';
-                    $messages["passengersData.{$p->id}.passport_file.required"] = 'صورة الجواز مطلوبة';
+
+            // Bug fix: this used to compare literal strings ('date_of_birth', 'document_number',
+            // 'passport_image') against $this->requirements, which is actually an array of
+            // {name, type, is_required} objects (RequirementPreset::items) — a string can never
+            // loosely-equal an array element that is itself an array, so in_array() was always
+            // false and none of these rules were ever added. Now reads each item's real `type`.
+            foreach ($this->requirements as $item) {
+                if (!($item['is_required'] ?? false)) {
+                    continue;
+                }
+
+                $type = $item['type'] ?? 'text';
+
+                if ($type === 'date') {
+                    $rules["passengersData.{$p->id}.date_of_birth"] = 'required|date|before:today';
+                    $messages["passengersData.{$p->id}.date_of_birth.required"] = 'تاريخ الميلاد مطلوب';
+                } elseif ($type === 'image') {
+                    // If not already has media, require upload
+                    if (!$p->hasMedia('identity_documents')) {
+                        $rules["passengersData.{$p->id}.passport_file"] = 'required|image|max:5120';
+                        $messages["passengersData.{$p->id}.passport_file.required"] = 'صورة الجواز مطلوبة';
+                    }
+                } else {
+                    $rules["passengersData.{$p->id}.document_number"] = 'required|string';
+                    $messages["passengersData.{$p->id}.document_number.required"] = 'رقم الوثيقة مطلوب';
                 }
             }
         }
-        
+
         $this->validate($rules, $messages);
     }
 
@@ -155,6 +189,9 @@ class CustomerBookingPortal extends Component
                     ->lockForUpdate()
                     ->firstOrFail();
 
+                $preset = $this->booking->tripInstance->tripTemplate->requirementPreset;
+                $requirementService = app(\App\Services\RequirementValidationService::class);
+
                 // Re-fetch taken seats from DB directly to ensure we have the absolute latest state
                 $takenSeats = Passenger::whereHas('booking', fn($q) => $q->where('trip_instance_id', $tripInstance->id))
                     ->where('booking_id', '!=', $this->booking->id)
@@ -168,7 +205,10 @@ class CustomerBookingPortal extends Component
 
                     // Double Verification: Is seat valid?
                     if ($requestedSeat) {
-                        if ($requestedSeat < 1 || $requestedSeat > ($tripInstance->seats_count ?? 50)) {
+                        if ($tripInstance->available_seats === null) {
+                            throw new \Exception("لا يوجد نظام تخصيص مقاعد مرقمة لهذه الرحلة.");
+                        }
+                        if ($requestedSeat < 1 || $requestedSeat > $tripInstance->available_seats) {
                             throw new \Exception("رقم المقعد المحدد غير صحيح.");
                         }
                         if (in_array((string)$requestedSeat, $takenSeats)) {
@@ -193,6 +233,19 @@ class CustomerBookingPortal extends Component
                           ->usingFileName($data['passport_file']->getClientOriginalName())
                           ->toMediaCollection('identity_documents', 'private');
                     }
+
+                    // Requirement (E): recompute and persist requirements_complete now that this
+                    // passenger's data/document has just been saved — this is the automatic
+                    // clearing side effect once the actual document is uploaded via this
+                    // post-booking flow. Recomputed against the shared validator (not just
+                    // assumed true because validatePassengers() passed) so it stays accurate
+                    // even if validation rules and this check ever drift.
+                    $missing = $requirementService->findMissingRequirements($preset, [[
+                        'document_number' => $data['document_number'] ?? null,
+                        'date_of_birth' => $data['date_of_birth'] ?? null,
+                        'has_identity_document' => $p->hasMedia('identity_documents'),
+                    ]]);
+                    $p->update(['requirements_complete' => $requirementService->isPassengerComplete($missing, 0)]);
                 }
             });
         } catch (\Exception $e) {

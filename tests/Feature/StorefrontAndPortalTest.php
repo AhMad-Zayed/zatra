@@ -10,7 +10,6 @@ use App\Models\Booking;
 use App\Enums\BookingStatus;
 use App\Services\CustomerAuthService;
 use App\Services\BookingService;
-use App\Livewire\Storefront\Checkout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
@@ -71,71 +70,11 @@ class StorefrontAndPortalTest extends TestCase
         $this->assertFalse($this->authService->verifyOtp($phone, '0000'));
     }
 
-    public function test_one_page_checkout_livewire_component(): void
-    {
-        Notification::fake();
-        
-        $tenant = Tenant::create(['name' => 'Agency North']);
-        $template = TripTemplate::create([
-            'tenant_id' => $tenant->id,
-            'title' => 'Wadi Rum Adventure',
-            'base_price' => 100.00,
-        ]);
-        $instance = TripInstance::create([
-            'tenant_id' => $tenant->id,
-            'trip_template_id' => $template->id,
-            'start_date' => now()->addDays(5),
-            'end_date' => now()->addDays(7),
-            'available_seats' => 15,
-            'status' => 'active',
-        ]);
-
-        // Bind the tenant to context
-        app()->instance(Tenant::class, $tenant);
-
-        Livewire::test(Checkout::class, ['instance' => $instance])
-            ->set('phone', '0791234567')
-            ->set('name', 'Hassan Booker')
-            ->set('email', 'hassan@example.com')
-            ->call('sendVerificationCode')
-            ->assertSet('showOtpInput', true)
-            ->set('otp', '1234') // 1234 works in testing env
-            ->call('verifyCode')
-            ->assertSet('isVerified', true)
-            ->assertSet('showOtpInput', false)
-            // Configure passengers
-            ->set('passengerCount', 2)
-            ->set('passengers.0.name', 'Passenger One')
-            ->set('passengers.0.passport_number', 'P987654')
-            ->set('passengers.1.name', 'Passenger Two')
-            ->set('passengers.1.passport_number', 'P987653')
-            // Set travel extras
-            ->set('needsFlight', true)
-            ->set('flightDetails', 'Direct flight requested')
-            ->set('needsHotel', true)
-            ->set('hotelDetails', 'Double room')
-            ->call('submitBooking')
-            ->assertHasNoErrors();
-
-        // Assert booking details in DB
-        $this->assertDatabaseHas('bookings', [
-            'tenant_id' => $tenant->id,
-            'status' => BookingStatus::PENDING->value,
-            'total_amount' => 200.00, // 100 base price * 2 passengers
-            'flight_details' => 'Direct flight requested',
-            'hotel_details' => 'Double room',
-        ]);
-
-        // Assert passengers created
-        $this->assertDatabaseHas('passengers', [
-            'name' => 'Passenger One',
-            'passport_number' => 'P987654',
-        ]);
-        $this->assertDatabaseHas('passengers', [
-            'name' => 'Passenger Two',
-            'passport_number' => 'P987653',
-        ]);
-    }
+    // test_one_page_checkout_livewire_component removed: it exercised App\Livewire\Storefront\
+    // Checkout, a confirmed-dead component (no route or <livewire:> tag ever mounted it in
+    // production — the live `storefront.checkout` route is bound to CheckoutWizard) which has
+    // been deleted. CheckoutWizard's own live checkout path is covered separately in
+    // tests/Feature/Livewire/CheckoutWizardTest.php.
 
     public function test_customer_portal_login_and_dashboard(): void
     {

@@ -2,9 +2,10 @@
 
 namespace App\Services\Payments;
 
+use App\Enums\PaymentType;
 use App\Models\Booking;
 use App\Models\Payment;
-use App\Enums\PaymentStatus;
+use App\Services\BookingService;
 use Illuminate\Support\Facades\DB;
 
 class ProcessGatewayPaymentService
@@ -18,42 +19,42 @@ class ProcessGatewayPaymentService
     public function execute(array $paymentData): ?Payment
     {
         return DB::transaction(function () use ($paymentData) {
-            
-            // 1. Correct Pessimistic Locking Query (Fetch fresh to prevent race conditions)
+
+            // 1. Correct Pessimistic Locking Query (Fetch fresh to prevent race conditions).
+            // Locking here (before the idempotency check) is what makes that check race-safe:
+            // a second webhook delivery for the same booking blocks until this transaction
+            // commits, then sees the payment already created below.
             $booking = Booking::where('id', $paymentData['booking_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 2. Idempotency Check: Prevent double-crediting
+            // 2. Idempotency Check: Prevent double-crediting on webhook retries.
             if (Payment::where('reference_number', $paymentData['transaction_id'])->exists()) {
                 // Return null to signify an idempotent skip
                 return null;
             }
 
-            // 3. Create the Immutable Financial Ledger Record
-            $payment = Payment::create([
-                'tenant_id' => $paymentData['tenant_id'],
-                'booking_id' => $booking->id,
-                'reference_number' => $paymentData['transaction_id'],
-                'amount' => $paymentData['amount'],
-                'payment_method' => $paymentData['method'],
-            ]);
-
-            // 4. Calculate Financial Totals
-            $totalPaidCents = $booking->payments()->sum('amount');
-            $totalPaidFloat = $totalPaidCents / 100;
-            $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
-
-            // 5. Update Booking Statuses
-            $booking->update([
-                'total_paid' => $totalPaidFloat,
-                'balance_due' => $balanceDueFloat,
-                'payment_status' => $balanceDueFloat <= 0 ? PaymentStatus::Paid : PaymentStatus::PartiallyPaid,
-                // Transition booking status to Confirmed only if fully paid
-                'booking_status' => $balanceDueFloat <= 0 ? \App\Enums\BookingStatus::Confirmed : $booking->booking_status,
-            ]);
-
-            return $payment;
+            // 3-5. Delegate payment creation + totals/status recalculation to the same
+            // canonical, currency-checked path every other payment-creation surface uses
+            // (BookingService::recordPayment(), P0-6) instead of the hand-rolled Payment::create()
+            // + manual total/balance/status math this used to do inline — which never set
+            // Payment.currency at all, never validated it against the booking's currency, never
+            // recomputed grand_total from live passengers/addons/package/discount (silently
+            // trusting whatever grand_total already held), never guarded against writing over an
+            // already-Cancelled booking, and wrote no activity log entry. $receivedBy is null
+            // (no authenticated user in a webhook context) and $enforceBalanceGuard is false,
+            // preserving this path's pre-existing behavior of never rejecting an overpayment —
+            // recordPayment()'s own docblock anticipates exactly this caller.
+            return app(BookingService::class)->recordPayment(
+                $booking,
+                (float) $paymentData['amount'],
+                $paymentData['method'],
+                null,
+                PaymentType::PAYMENT,
+                $paymentData['transaction_id'],
+                $booking->currency,
+                false
+            );
         });
     }
 }

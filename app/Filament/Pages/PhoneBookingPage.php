@@ -90,6 +90,22 @@ class PhoneBookingPage extends Page
             );
         }
 
+        // Bug fix: $tripFilters ('internal'/'external', already rendered as filter chips in the
+        // Blade view) was never actually applied to this query — trip_type didn't exist yet to
+        // filter by. 'active' is a display-only chip already covered by the base query above.
+        // Both chips toggled together means "either type" (whereIn), not "neither" (which two
+        // separate AND'd whereHas calls would have produced).
+        $typeValues = [];
+        if (in_array('internal', $this->tripFilters, true)) {
+            $typeValues[] = \App\Enums\TripTypeEnum::Domestic->value;
+        }
+        if (in_array('external', $this->tripFilters, true)) {
+            $typeValues[] = \App\Enums\TripTypeEnum::International->value;
+        }
+        if (!empty($typeValues)) {
+            $query->whereHas('tripTemplate', fn ($q) => $q->whereIn('trip_type', $typeValues));
+        }
+
         return $query->orderBy('start_date')
             ->limit(10)
             ->get()
@@ -372,6 +388,19 @@ class PhoneBookingPage extends Page
                 'payment_type'       => 'full',
                 'phone_booking_mode' => true, // ← tells service to create placeholder passengers
             ]);
+
+            // Permissive requirement-preset check: never blocks — phone bookings deliberately
+            // collect nothing per-passenger, so this will fire on nearly every phone booking
+            // against a trip with a preset attached, by design. CreateBookingService::execute()
+            // already computed and persisted each passenger's requirements_complete flag.
+            if ($summary = app(\App\Services\RequirementValidationService::class)->summarizeIncompletePassengers($booking)) {
+                Notification::make()
+                    ->warning()
+                    ->title('تنبيه: بيانات ناقصة')
+                    ->body($summary)
+                    ->persistent()
+                    ->send();
+            }
 
             $this->pnr        = $booking->pnr;
             $this->booking_id = $booking->id;

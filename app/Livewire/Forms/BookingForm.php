@@ -37,7 +37,7 @@ class BookingForm extends Form
             'passengers.*.last_name' => ['required', 'string', 'max:255'],
             'passengers.*.document_type' => ['nullable', 'string'],
             'passengers.*.document_number' => ['nullable', 'string'],
-            'passengers.*.date_of_birth' => ['nullable', 'date'],
+            'passengers.*.date_of_birth' => ['nullable', 'date', 'before:today'],
             'passengers.*.trip_passenger_category_id' => [
                 'nullable',
                 'integer',

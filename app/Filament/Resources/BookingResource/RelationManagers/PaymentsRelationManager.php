@@ -10,8 +10,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-use App\Enums\PaymentStatus;
-
 class PaymentsRelationManager extends RelationManager
 {
     protected static string $relationship = 'payments';
@@ -27,6 +25,8 @@ class PaymentsRelationManager extends RelationManager
                     ->required()
                     ->numeric()
                     ->prefix('$')
+                    ->minValue(1)
+                    ->helperText('الحد الأدنى للدفعة: 1')
                     ->default(fn () => $this->getOwnerRecord()?->balance_due)
                     ->maxValue(function () {
                         return $this->getOwnerRecord()->balance_due;
@@ -115,33 +115,20 @@ class PaymentsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
+                // P0-6: business logic (payment creation, recalculation, status transition)
+                // now lives entirely in BookingService::recordPayment() — this action is a
+                // thin orchestration layer supplying form data and a success notification.
                 Tables\Actions\CreateAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        $data['tenant_id'] = $this->getOwnerRecord()->tenant_id;
-                        $data['type'] = \App\Enums\PaymentType::PAYMENT;
-                        $data['received_by'] = auth()->id();
-                        return $data;
-                    })
-                    ->after(function () {
-                        $booking = $this->getOwnerRecord();
-                        // sum('amount') includes negative amounts from reversals, giving the correct net total.
-                        $totalPaidCents = $booking->payments()->sum('amount');
-                        
-                        $totalPaidFloat = $totalPaidCents / 100;
-                        $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
-                        
-                        $paymentStatus = PaymentStatus::Unpaid;
-                        if ($totalPaidFloat > 0 && $balanceDueFloat > 0) {
-                            $paymentStatus = PaymentStatus::PartiallyPaid;
-                        } elseif ($balanceDueFloat <= 0) {
-                            $paymentStatus = PaymentStatus::Paid;
-                        }
-                        
-                        $booking->update([
-                            'total_paid' => $totalPaidFloat,
-                            'balance_due' => $balanceDueFloat,
-                            'payment_status' => $paymentStatus,
-                        ]);
+                    ->using(function (array $data) {
+                        return app(\App\Services\BookingService::class)->recordPayment(
+                            $this->getOwnerRecord(),
+                            (float) $data['amount'],
+                            $data['payment_method'],
+                            auth()->user(),
+                            \App\Enums\PaymentType::PAYMENT,
+                            $data['reference_number'] ?? null,
+                            $data['currency'] ?? null,
+                        );
                     })
                     ->visible(fn () => $this->getOwnerRecord()->balance_due > 0),
             ])
@@ -157,37 +144,21 @@ class PaymentsRelationManager extends RelationManager
                     ->modalSubmitActionLabel('نعم، قم بعكس الدفعة')
                     ->visible(fn ($record) => $record->type === \App\Enums\PaymentType::PAYMENT && $record->amount > 0)
                     ->action(function ($record) {
-                        \App\Models\Payment::create([
-                            'tenant_id' => $record->tenant_id,
-                            'booking_id' => $record->booking_id,
-                            // $record->amount uses MoneyCast, so it is in dollars. Payment accepts dollars and saves cents.
-                            'amount' => -$record->amount,
-                            'payment_method' => $record->payment_method,
-                            'reference_number' => 'REV-' . ($record->reference_number ?: $record->id),
-                            'type' => \App\Enums\PaymentType::REVERSAL,
-                            'received_by' => auth()->id(),
-                        ]);
-
-                        // Recalculate totals
-                        $booking = $record->booking;
-                        $totalPaidCents = $booking->payments()->sum('amount');
-                        
-                        $totalPaidFloat = $totalPaidCents / 100;
-                        $balanceDueFloat = max(0, $booking->grand_total - $totalPaidFloat);
-                        
-                        $paymentStatus = PaymentStatus::Unpaid;
-                        if ($totalPaidFloat > 0 && $balanceDueFloat > 0) {
-                            $paymentStatus = PaymentStatus::PartiallyPaid;
-                        } elseif ($balanceDueFloat <= 0) {
-                            $paymentStatus = PaymentStatus::Paid;
+                        try {
+                            app(\App\Services\BookingService::class)->reversePayment(
+                                $record,
+                                'Manual reversal via admin panel',
+                                auth()->user(),
+                            );
+                        } catch (\RuntimeException $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('تعذر عكس الدفعة')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                            return;
                         }
-                        
-                        $booking->update([
-                            'total_paid' => $totalPaidFloat,
-                            'balance_due' => $balanceDueFloat,
-                            'payment_status' => $paymentStatus,
-                        ]);
-                        
+
                         \Filament\Notifications\Notification::make()
                             ->title('تم التراجع عن الدفعة بنجاح')
                             ->success()

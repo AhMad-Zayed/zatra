@@ -23,6 +23,12 @@ class RequirementPresetResource extends Resource
     protected static ?string $modelLabel = 'قالب متطلبات';
     protected static ?string $pluralModelLabel = 'قوالب المتطلبات';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('tenant_id', \Filament\Facades\Filament::getTenant()->id);
+    }
+
     public static function form(Form $form): Form
     {
         return $form

@@ -96,7 +96,7 @@ class WaitingListsRelationManager extends RelationManager
                     ->visible(fn ($record) => $record->status === WaitingListStatusEnum::Pending)
                     ->action(function ($record) {
                         \Illuminate\Support\Facades\DB::transaction(function () use ($record) {
-                            $instance = \App\Models\TripInstance::lockForUpdate()->find($record->trip_instance_id);
+                            $instance = \App\Models\TripInstance::lockForUpdate()->find($this->getOwnerRecord()->getKey());
                             if ($instance->getRemainingSeatsAttribute() < 1) {
                                 \Filament\Notifications\Notification::make()
                                     // Fixed to Arabic
@@ -107,10 +107,10 @@ class WaitingListsRelationManager extends RelationManager
                             }
 
                             // Create a 2-hour hold BEFORE sending the link
-                            \App\Models\InventoryLedger::create([
+                            $hold = \App\Models\InventoryLedger::create([
                                 'trip_instance_id' => $instance->id,
                                 'quantity'         => -1,
-                                'type'             => 'waitlist_hold',
+                                'type'             => 'hold',
                                 'expires_at'       => now()->addHours(2),
                             ]);
 
@@ -120,9 +120,13 @@ class WaitingListsRelationManager extends RelationManager
                                 ['waitingList' => $record->id]
                             );
 
+                            // hold_id is persisted (mirroring guest_sessions.hold_id) so a
+                            // customer who redeems this link reuses this exact hold via
+                            // CheckoutWizard instead of a second, independent one being opened.
                             $record->update([
                                 'status' => WaitingListStatusEnum::Notified,
                                 'notified_at' => now(),
+                                'hold_id' => $hold->id,
                             ]);
 
                             $channelPreference = $record->tenant->settings['waiting_list_channel'] ?? 'both';

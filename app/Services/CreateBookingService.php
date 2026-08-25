@@ -12,6 +12,7 @@ use App\Models\TripPassengerCategory;
 use App\Exceptions\InventoryExhaustedException;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -26,7 +27,8 @@ class CreateBookingService
      * Executes the creation of a booking, processing passengers, addons, and financials.
      * 
      * @param array $data Unified booking payload
-     * Expected keys: tenant_id, trip_instance_id, customer_id, passengersData, addonsData, user_id (optional creator), notes (optional)
+     * Expected keys: tenant_id, trip_instance_id, customer_id, passengersData, addonsData, user_id (optional creator), notes (optional),
+     * room_selections (optional, Hotel/Rooming Ticket 2 — [['room_type_id'=>int,'quantity'=>int,'occupancy_type'=>'shared'|'single'], ...])
      * @throws InventoryExhaustedException
      */
     public function execute(array $data): Booking
@@ -65,53 +67,13 @@ class CreateBookingService
             
             // Check if we are checking out from a guest session hold
             $holdId = $data['hold_id'] ?? null;
-            $hold = null;
+$hold = null;
+if ($holdId) { $hold = \App\Models\InventoryLedger::find($holdId); }
             
             if ($holdId) {
                 $hold = \App\Models\InventoryLedger::find($holdId);
             }
 
-            if ($tripInstance->available_seats !== null) {
-                $ledgerSum = \App\Models\InventoryLedger::where('trip_instance_id', $tripInstanceId)
-                    ->where(function ($q) {
-                        $q->whereNull('expires_at')
-                          ->orWhere('expires_at', '>', now());
-                    })
-                    ->sum('quantity');
-
-                $remaining = $tripInstance->available_seats + $ledgerSum;
-                
-                // If there's an existing hold, we add back the held quantity to see true remaining capacity
-                // because the hold is already subtracted from ledgerSum
-                $effectiveRemaining = $hold ? ($remaining + abs($hold->quantity)) : $remaining;
-
-                if ($effectiveRemaining < $requestedSeats) {
-                    throw new \App\Exceptions\InsufficientSeatsException("نأسف، المقاعد المتبقية فقط " . max(0, $effectiveRemaining) . " مقاعد.");
-                }
-
-                if (!$hold) {
-                    $hold = \App\Models\InventoryLedger::create([
-                        'trip_instance_id' => $tripInstanceId,
-                        'quantity' => -$requestedSeats,
-                        'type' => 'confirmed',
-                    ]);
-                } else {
-                    // Convert the existing hold to a confirmed entry
-                    $hold->update([
-                        'type' => 'confirmed',
-                        'expires_at' => null,
-                        'quantity' => -$requestedSeats // update to final quantity
-                    ]);
-                }
-            } else if ($hold) {
-                $hold->update([
-                    'type' => 'confirmed',
-                    'expires_at' => null,
-                    'quantity' => -$requestedSeats
-                ]);
-            }
-
-            // Generate a unique PNR
             $pnr = 'ZTR-' . strtoupper(\Illuminate\Support\Str::random(6));
             while (Booking::where('pnr', $pnr)->exists()) {
                 $pnr = 'ZTR-' . strtoupper(\Illuminate\Support\Str::random(6));
@@ -167,15 +129,25 @@ class CreateBookingService
             $totalAmount = 0;
             $overrideAmount = $tripInstance->price_override ? $tripInstance->price_override_amount : 0;
 
-            if ($hold) {
-                $hold->update(['booking_id' => $booking->id]);
-            }
+            // Requirement-preset tracking: computed once for the whole passenger set here and
+            // persisted per-passenger via requirements_complete below. This runs unconditionally
+            // for every entry point (strict or permissive) — this method never blocks on it;
+            // whether a caller blocks BEFORE reaching here (CheckoutWizard, on text/date misses
+            // only) is entirely their own pre-check against the same shared service. A passenger
+            // can therefore pass a strict pre-check and still land here with
+            // requirements_complete = false if an image-type item is outstanding, since no
+            // booking-time entry point can collect a document image yet — only the post-booking
+            // CustomerBookingPortal flow can, which clears the flag once it does.
+            $requirementPreset = $tripInstance->tripTemplate?->requirementPreset;
+            $requirementService = app(\App\Services\RequirementValidationService::class);
+            $missingRequirements = $requirementService->findMissingRequirements($requirementPreset, $passengersData);
 
             // 4. Process Passengers
             // Phone booking mode: passengersData may contain seat-allocation entries without names.
             // In this case we create placeholder passenger records (data_complete = false).
             $isPhoneBooking = $data['phone_booking_mode'] ?? false;
 
+            \App\Models\Passenger::withoutEvents(function () use (&$passengersData, &$tripInstanceId, &$tenantId, &$booking, &$tripInstance, &$totalAmount, &$isPhoneBooking, &$overrideAmount, &$requirementService, &$missingRequirements) {
             foreach ($passengersData as $index => $pData) {
                 $tier = TripPassengerCategory::where('id', $pData['trip_passenger_category_id'])
                             ->where('trip_instance_id', $tripInstanceId)
@@ -199,6 +171,7 @@ class CreateBookingService
                     'extra_preferences'          => is_array($pData['extra_preferences'] ?? null) ? $pData['extra_preferences'] : [],
                     // Phone booking placeholders:
                     'data_complete'              => !$isIncomplete,
+                    'requirements_complete'      => $requirementService->isPassengerComplete($missingRequirements, $index),
                     'passenger_label'            => $isIncomplete ? "راكب {$humanIndex} ({$tier->name})" : null,
                 ]);
 
@@ -212,8 +185,7 @@ class CreateBookingService
                 
                 $totalAmount += $finalPrice;
             }
-
-
+            });
             // 5. Process Addons
             foreach ($addonsData as $aData) {
                 $addon = TripAddon::where('id', $aData['trip_addon_id'])
@@ -258,6 +230,67 @@ class CreateBookingService
                 $totalAmount += ($packageAdjustment * count($passengersData));
             }
 
+            // Hotel/Rooming redesign Ticket 2 — Process Room Selections (booking-time room-TYPE
+            // quantity/occupancy only, no per-passenger assignment yet — Ticket 3). Built
+            // entirely alongside the PackageOption block above, which stays untouched; a trip is
+            // configured with one system or the other, never both in practice, and this block
+            // simply does nothing if $data['room_selections'] is empty.
+            //
+            // Kill-switch (backend enforcement, belt-and-suspenders with the UI-level gate in
+            // CheckoutWizard): tenants.settings['room_booking_enabled'] defaults to false
+            // (opt-in per tenant). If a room_selections payload arrives while the switch is off
+            // — a stale UI, a direct API call, anything — it is silently ignored (not rejected
+            // with an error) so a booking can still be created normally minus rooms; the whole
+            // point of a kill switch is to make the feature behave as if it never existed, not
+            // to turn a safety toggle into a new way for bookings to start failing.
+            $roomSelectionsData = $data['room_selections'] ?? [];
+            if (!empty($roomSelectionsData)) {
+                $roomBookingEnabled = (bool) ($tripInstance->tenant?->settings['room_booking_enabled'] ?? false);
+
+                if (!$roomBookingEnabled) {
+                    \Illuminate\Support\Facades\Log::warning(
+                        "Ignored room_selections payload for tenant {$tenantId}: room_booking_enabled is off.",
+                        ['trip_instance_id' => $tripInstanceId, 'booking_id' => $booking->id]
+                    );
+                } else {
+                    // Lock ordering: TripInstance is already locked above (step 1) before this
+                    // point is ever reached — RoomInventoryService locks RoomType rows second,
+                    // per its own documented lock-ordering contract. Do not reverse this.
+                    $resolvedRoomSelections = app(\App\Services\RoomInventoryService::class)
+                        ->consumeForBooking($booking, $roomSelectionsData);
+
+                    foreach ($resolvedRoomSelections as $resolved) {
+                        $roomType = $resolved['room_type'];
+                        $quantity = $resolved['quantity'];
+                        $occupancyType = $resolved['occupancy_type'];
+
+                        // Pricing formula (confirmed): price_adjustment_shared (per person) +
+                        // price_adjustment_single_supplement (flat, only when occupancy_type =
+                        // single), per room. Shared occupancy assumes the room's full
+                        // capacity_per_room is occupied.
+                        $perRoomCharge = (float) $roomType->price_adjustment_shared;
+                        if ($occupancyType === 'single') {
+                            $perRoomCharge += (float) $roomType->price_adjustment_single_supplement;
+                        } else {
+                            $perRoomCharge *= $roomType->capacity_per_room;
+                        }
+
+                        $selectionTotal = $perRoomCharge * $quantity;
+
+                        \App\Models\BookingRoomSelection::create([
+                            'tenant_id' => $tenantId,
+                            'booking_id' => $booking->id,
+                            'room_type_id' => $roomType->id,
+                            'quantity' => $quantity,
+                            'occupancy_type' => $occupancyType,
+                            'price_at_booking' => $selectionTotal,
+                        ]);
+
+                        $totalAmount += $selectionTotal;
+                    }
+                }
+            }
+
             // Apply Discount
             $discountAmount = $data['discount_amount'] ?? 0;
             $totalAmount = max(0, $totalAmount - $discountAmount);
@@ -281,7 +314,47 @@ class CreateBookingService
             // Dispatch Event for Background Notifications
             event(new \App\Events\BookingCreated($booking));
 
+            
+            // Consume Inventory
+            $seatsToConsume = collect($passengersData)->filter(function ($pData) {
+                $tier = \App\Models\TripPassengerCategory::find($pData['trip_passenger_category_id'] ?? null);
+                return $tier && $tier->requires_seat;
+            })->count();
+            
+            app(\App\Services\InventoryService::class)->consumeForBooking($booking, $seatsToConsume, $hold);
+            
+            // Recalculate totals centrally
+            app(\App\Services\BookingService::class)->recalculateTotals($booking);
+            
+                        // 7. Process Initial Payment (if provided) — delegates to the canonical
+            // BookingService::recordPayment() (the same currency-check + recalculateTotals()
+            // pattern every other payment-creation path uses, P0-6) instead of a raw
+            // Payment::create() with hand-rolled math. Bug fix: currency now comes from
+            // $booking->currency (== $tripInstance->currency, set above) instead of
+            // $tripInstance->tenant->currency — the two can legitimately differ (a tenant can
+            // run trips in more than one currency), which previously mislabeled the payment.
+            // recordPayment()'s own balance guard (amount must not exceed balance_due, which
+            // equals grand_total here since this is the booking's first-ever payment) replaces
+            // the manual pre-check this used to do inline, with the same reject-and-roll-back-
+            // the-whole-booking-creation behavior since it's still inside this method's
+            // transaction.
+            $initialPaymentAmount = (float) ($data['initial_payment_amount'] ?? 0);
+            if ($initialPaymentAmount > 0) {
+                $initialPaymentType = ($paymentType === 'deposit') ? PaymentType::DEPOSIT : PaymentType::FULL;
+
+                app(\App\Services\BookingService::class)->recordPayment(
+                    $booking,
+                    $initialPaymentAmount,
+                    $data['initial_payment_method'] ?? 'cash',
+                    $creatorUserId ? \App\Models\User::find($creatorUserId) : null,
+                    $initialPaymentType,
+                    null,
+                    $booking->currency
+                );
+            }
+            
             return $booking;
+
         });
     }
 }
