@@ -22,7 +22,7 @@ class QuickBookingPage extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon    = 'heroicon-o-bolt';
-    protected static ?string $navigationGroup   = 'العمليات اليومية';
+    protected static ?string $navigationGroup   = 'الحجوزات والعملاء';
     protected static ?int    $navigationSort     = 0; // Appears first in the group
     protected static ?string $navigationLabel   = '⚡ حجز سريع';
     protected static ?string $title             = 'حجز جديد — خطوة بخطوة';

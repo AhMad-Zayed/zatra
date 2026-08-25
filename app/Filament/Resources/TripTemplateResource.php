@@ -17,8 +17,8 @@ class TripTemplateResource extends Resource
 {
     protected static ?string $model = TripTemplate::class;
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
-    protected static ?string $navigationGroup = 'إدارة الرحلات';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationGroup = 'الرحلات والفنادق';
+    protected static ?int $navigationSort = 2;
 
     public static function getNavigationLabel(): string
     {

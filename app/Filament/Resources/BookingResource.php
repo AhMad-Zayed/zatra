@@ -25,7 +25,7 @@ class BookingResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-ticket';
     
-    protected static ?string $navigationGroup = 'العمليات اليومية';
+    protected static ?string $navigationGroup = 'الحجوزات والعملاء';
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'pnr';
 

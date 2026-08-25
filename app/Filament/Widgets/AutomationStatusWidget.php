@@ -10,6 +10,7 @@ class AutomationStatusWidget extends BaseWidget
 {
     protected static ?string $heading = 'حالة النظام الآلي (Automation Engine)';
     protected int | string | array $columnSpan = 'full';
+    protected static ?int $sort = 4;
 
     public function table(Table $table): Table
     {

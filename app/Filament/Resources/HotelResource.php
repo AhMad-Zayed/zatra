@@ -21,7 +21,8 @@ class HotelResource extends Resource
     protected static ?string $model = Hotel::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'اللوجستيات';
+    protected static ?string $navigationGroup = 'الرحلات والفنادق';
+    protected static ?int $navigationSort = 3;
 
     public static function getNavigationLabel(): string
     {

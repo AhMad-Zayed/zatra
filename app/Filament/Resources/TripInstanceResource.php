@@ -35,7 +35,7 @@ class TripInstanceResource extends Resource
     }
 
     // Navigation group — matches TripBuilderResource
-    protected static ?string $navigationGroup = 'إدارة الرحلات';
+    protected static ?string $navigationGroup = 'الرحلات والفنادق';
     protected static ?int $navigationSort = 1;
 
     // N+1-003: Eager load tripTemplate to prevent N queries per row in the table

@@ -18,7 +18,8 @@ class RequirementPresetResource extends Resource
     protected static ?string $model = RequirementPreset::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
-    protected static ?string $navigationGroup = 'الإدارة والإعدادات';
+    protected static ?string $navigationGroup = 'الإعدادات والإدارة';
+    protected static ?int $navigationSort = 3;
     protected static ?string $navigationLabel = 'قوالب المتطلبات';
     protected static ?string $modelLabel = 'قالب متطلبات';
     protected static ?string $pluralModelLabel = 'قوالب المتطلبات';

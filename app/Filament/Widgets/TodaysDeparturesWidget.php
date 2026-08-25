@@ -22,7 +22,7 @@ class TodaysDeparturesWidget extends Widget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected static ?int $sort = 0;
+    protected static ?int $sort = 3;
 
     public function getTodaysDepartures(): \Illuminate\Support\Collection
     {

@@ -21,7 +21,7 @@ use Filament\Pages\Page;
 class PhoneBookingPage extends Page
 {
     protected static ?string $navigationIcon  = 'heroicon-o-phone';
-    protected static ?string $navigationGroup = 'العمليات اليومية';
+    protected static ?string $navigationGroup = 'الحجوزات والعملاء';
     protected static ?int    $navigationSort   = 0; // First item in group
     protected static ?string $navigationLabel = '📞 حجز هاتفي';
     protected static ?string $title           = '📞 حجز هاتفي سريع';

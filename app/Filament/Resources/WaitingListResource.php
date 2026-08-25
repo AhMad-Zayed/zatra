@@ -21,7 +21,7 @@ class WaitingListResource extends Resource
     protected static ?string $pluralModelLabel = 'طلبات الانتظار';
     protected static ?string $modelLabel = 'طلب انتظار';
     protected static ?string $navigationGroup = 'الحجوزات والعملاء';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 2;
 
     public static function getEloquentQuery(): Builder
     {
