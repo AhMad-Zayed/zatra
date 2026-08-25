@@ -105,7 +105,8 @@ class BookingResource extends Resource
                                             ->get()
                                             ->mapWithKeys(function ($instance) {
                                                 return [$instance->id => $instance->tripTemplate->title . ' (' . $instance->start_date->format('Y-m-d') . ')'];
-                                            });
+                                            })
+                                            ->toArray();
                                     })
                                     ->searchable()
                                     ->preload() // Shows all options without typing
@@ -333,7 +334,7 @@ class BookingResource extends Resource
                                             ->options(function (Forms\Get $get) {
                                                 $instanceId = $get('../../trip_instance_id');
                                                 if (!$instanceId) return [];
-                                                return TripPassengerCategory::where('trip_instance_id', $instanceId)->pluck('name', 'id');
+                                                return TripPassengerCategory::where('trip_instance_id', $instanceId)->pluck('name', 'id')->toArray();
                                             })
                                             ->required()
                                             ->live()
@@ -364,7 +365,7 @@ class BookingResource extends Resource
                                                 if (!$instanceId) return [];
                                                 return PickupPoint::whereHas('pickupRoute.tripInstances', fn ($q) =>
                                                     $q->where('trip_instances.id', $instanceId)
-                                                )->pluck('name', 'id');
+                                                )->pluck('name', 'id')->toArray();
                                             })
                                             ->nullable(),
                                     ])
@@ -398,7 +399,8 @@ class BookingResource extends Resource
                                                 if ($bookingId) {
                                                     return \App\Models\Passenger::where('booking_id', $bookingId)
                                                         ->get()
-                                                        ->mapWithKeys(fn ($p) => [$p->id => $p->first_name . ' ' . $p->last_name]);
+                                                        ->mapWithKeys(fn ($p) => [$p->id => $p->first_name . ' ' . $p->last_name])
+                                                        ->toArray();
                                                 }
                                                 return [];
                                             })
@@ -410,7 +412,7 @@ class BookingResource extends Resource
                                             ->options(function (Forms\Get $get) {
                                                 $instanceId = $get('../../trip_instance_id');
                                                 if (!$instanceId) return [];
-                                                return \App\Models\TripAddon::where('trip_instance_id', $instanceId)->pluck('name', 'id');
+                                                return \App\Models\TripAddon::where('trip_instance_id', $instanceId)->pluck('name', 'id')->toArray();
                                             })
                                             ->required()
                                             ->live()
@@ -527,7 +529,13 @@ class BookingResource extends Resource
                                     
                                 Forms\Components\Select::make('initial_payment_method')
                                     ->label('طريقة الدفع')
-                                    ->options(\App\Enums\PaymentMethodEnum::class)
+                                    // App\Enums\PaymentMethodEnum never existed (class_exists() false) —
+                                    // this is the same literal option set already used for this exact
+                                    // field elsewhere (see PaymentsRelationManager, PaymentResource).
+                                    ->options([
+                                        'cash' => 'نقدي',
+                                        'bank_transfer' => 'تحويل بنكي',
+                                    ])
                                     ->default('cash')
                                     ->required(fn (Forms\Get $get) => $get('initial_payment_amount') > 0)
                             ]),
@@ -638,7 +646,7 @@ class BookingResource extends Resource
                     ->options(\App\Enums\BookingStatus::class),
                 Tables\Filters\SelectFilter::make('trip_instance_id')
                     ->label('الرحلة')
-                    ->options(fn () => \App\Models\TripInstance::with('tripTemplate')->get()->mapWithKeys(fn ($i) => [$i->id => $i->tripTemplate->title . ' (' . $i->start_date->format('Y-m-d') . ')']))
+                    ->options(fn () => \App\Models\TripInstance::with('tripTemplate')->get()->mapWithKeys(fn ($i) => [$i->id => $i->tripTemplate->title . ' (' . $i->start_date->format('Y-m-d') . ')'])->toArray())
                     ->searchable(),
                 Tables\Filters\TernaryFilter::make('requirements_status')
                     ->label('متطلبات الرحلة')
@@ -1084,7 +1092,8 @@ class BookingResource extends Resource
                                     ->get()
                                     ->mapWithKeys(function ($t) {
                                         return [$t->id => $t->tripTemplate?->title . ' — ' . $t->start_date?->format('Y-m-d') . ' (' . $t->remaining_seats . ' مقعد متاح)'];
-                                    });
+                                    })
+                                    ->toArray();
                             })
                             ->searchable()
                             ->required()

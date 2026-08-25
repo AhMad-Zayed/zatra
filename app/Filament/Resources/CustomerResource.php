@@ -23,14 +23,16 @@ class CustomerResource extends Resource
     protected static ?string $model = Customer::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationGroup = 'الحجوزات والعملاء';
+    protected static ?string $navigationGroup = 'الحجوزات';
     protected static ?int $navigationSort = 3;
 
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function getGloballySearchableAttributes(): array
     {
-        return ['name', 'phone', 'email', 'identity_number'];
+        // 'identity_number' removed: not a real column on `customers` — searching against it
+        // threw SQLSTATE[42S22] "Unknown column" on every global-search query.
+        return ['name', 'phone', 'email'];
     }
 
     public static function getNavigationLabel(): string
