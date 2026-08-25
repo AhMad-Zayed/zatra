@@ -1,0 +1,102 @@
+/*
+ * Azure Horizon — presentation-layer overrides on top of Filament's default theme.
+ *
+ * Scope: everything here targets Filament's own stable `fi-*` hook classes (the documented,
+ * supported customization surface for a compiled theme) rather than fighting or duplicating
+ * Tailwind's shared utility classes, which are reused across unrelated components.
+ *
+ * What's NOT here because it's already Filament's default behavior, confirmed against the
+ * vendor source before touching anything:
+ *   - Border radius: Tailwind's stock scale (sm=2px, DEFAULT=4px, md=6px, lg=8px, xl=12px,
+ *     full=pill) already matches the spec's "rounded" scale exactly — nothing to override.
+ *   - No table zebra striping (opt-in per table via ->striped(), unused here).
+ *   - Chart vertical gridlines already off, axis label color already muted gray, data points
+ *     already rendered as small circles — see RevenueChart::getOptions() for what *was* changed.
+ *   - Font family: set via ->font() in AdminPanelProvider, not here.
+ *   - Sidebar width: set via ->sidebarWidth() in AdminPanelProvider, not here.
+ *   - Primary/accent/success/danger/warning hues: set via ->colors() in AdminPanelProvider,
+ *     which is what drives all the --primary-N, --accent-N, etc custom properties used below.
+ */
+
+/* ── Elevation: Level 1 (Cards) — white bg, subtle 1px border, no shadow ──────────────────── */
+/* Forcing box-shadow to none outright (rather than trying to reset the --tw-ring-* variables
+   Filament's own ring-1 utility composites its shadow from) is what makes this win regardless of
+   the two rules' relative order in the compiled stylesheet. */
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-ta-ctn {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+}
+.dark .fi-section,
+.dark .fi-wi-stats-overview-stat,
+.dark .fi-ta-ctn {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* ── Elevation: Level 2 (Interactive/floating) — dropdown panels (actions, user menu, searchable
+   selects all render through this shared component) ──────────────────────────────────────── */
+.fi-dropdown-panel {
+    box-shadow: 0 4px 12px rgba(15, 76, 129, 0.08) !important;
+}
+
+/* ── Elevation: Level 3 (Modals) — high shadow + backdrop blur ────────────────────────────── */
+.fi-modal-window {
+    box-shadow: 0 24px 48px -12px rgba(15, 76, 129, 0.18) !important;
+}
+.fi-modal-close-overlay {
+    backdrop-filter: blur(8px);
+}
+
+/* ── Input fields — 1px default border, 2px primary border on focus ──────────────────────── */
+/* Filament renders the input edge as a Tailwind `ring` (box-shadow), not a real `border` — the
+   width baked into `ring-1` can't be changed via the `--tw-ring-color` variable alone, so the
+   box-shadow is set directly here instead of fighting the ring utility's internals. */
+.fi-input-wrp {
+    box-shadow: 0 0 0 1px #cbd5e1 !important;
+}
+.fi-input-wrp:has(:focus) {
+    box-shadow: 0 0 0 2px rgb(var(--primary-600)) !important;
+}
+
+/* ── Data tables — light header band, subtle small-caps labels, blue-tinted row hover ──────── */
+.fi-ta-header-cell {
+    background-color: #f1f5f9 !important;
+}
+.fi-ta-header-cell .fi-ta-header-cell-label {
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.dark .fi-ta-header-cell {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+.fi-ta-row:hover {
+    background-color: #f0f7ff !important;
+}
+.dark .fi-ta-row:hover {
+    background-color: rgba(0, 53, 95, 0.12) !important;
+}
+
+/* ── Sidebar nav — active item gets a vertical brand-color bar on the sidebar's outer edge ─── */
+.fi-sidebar-item-button {
+    position: relative;
+}
+.fi-sidebar-item.fi-active .fi-sidebar-item-button::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: -0.5rem;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 3px;
+    border-radius: 9999px;
+    background-color: rgb(var(--primary-600));
+}
+
+/* ── Status chips — fully pill-shaped, per spec ("Status indicators: fully rounded") ───────── */
+/* Filament applies rounded-md directly on .fi-badge, same specificity as this selector, so
+   !important is what makes this win regardless of compiled-stylesheet order. */
+.fi-badge {
+    border-radius: 9999px !important;
+}

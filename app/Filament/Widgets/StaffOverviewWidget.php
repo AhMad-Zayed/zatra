@@ -1,30 +1,35 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Widgets;
 
+use App\Enums\BookingStatus;
 use App\Models\Booking;
 use App\Models\TripInstance;
-use App\Enums\BookingStatus;
-use App\Enums\TripStatusEnum;
 use Filament\Facades\Filament;
-use Filament\Pages\Page;
+use Filament\Widgets\Widget;
 
-class StaffDashboard extends Page
+/**
+ * Role-gated replacement for the retired StaffDashboard page: same stats-row + upcoming-trips
+ * content agents/staff used to see on their own dashboard page, now a widget on the single
+ * unified Dashboard (App\Filament\Pages\Dashboard) — canView() decides who sees it, per the
+ * "same URL, same page, different visible content per role" decision. Read-only queries, same
+ * shape as DashboardStatsOverview; no business logic touched.
+ */
+class StaffOverviewWidget extends Widget
 {
-    protected static ?string $navigationIcon    = 'heroicon-o-home';
-    protected static ?string $navigationGroup   = null; // Top-level, no group
-    protected static ?int    $navigationSort     = -10; // Appears at the very top of the sidebar
-    protected static ?string $navigationLabel   = 'الرئيسية';
-    protected static ?string $title             = 'لوحة التحكم';
-    protected static string  $view              = 'filament.pages.staff-dashboard';
+    protected static string $view = 'filament.widgets.staff-overview';
 
-    /**
-     * Only show to non-admin users (agents / staff).
-     * Admins can see the default Filament Dashboard with analytics.
-     */
-    public static function canAccess(): bool
+    protected int | string | array $columnSpan = 'full';
+
+    protected static ?int $sort = 1;
+
+    public static function canView(): bool
     {
-        return auth()->user()?->hasAnyRole(['agent', 'staff', 'agency_admin']) ?? false;
+        // 'agent'/'staff' are not real role names anywhere in this app (RoleAndPermissionSeeder /
+        // DatabaseSeeder both use 'booking_agent') — the retired StaffDashboard::canAccess() had
+        // the same mismatch, so it was only ever reachable by agency_admin in practice, despite
+        // its own docblock claiming "non-admin users (agents/staff)". Using the real role here.
+        return auth()->user()?->hasRole('booking_agent') ?? false;
     }
 
     public function getStats(): array

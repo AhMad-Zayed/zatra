@@ -1,0 +1,22 @@
+@import './azure-horizon.css';
+
+/*
+ * Not `@import '../../../../vendor/filament/filament/resources/css/theme.css';` (Filament's own
+ * scaffolded default) — that file chains into `@import 'tailwindcss/base'` etc, a bare-specifier
+ * import that postcss-import resolves by walking UP the filesystem from
+ * vendor/filament/filament/resources/css, which terminates at this project's root node_modules —
+ * where tailwindcss v4 is installed (needed by the separate Vite/storefront pipeline). v4 has no
+ * `./base` export, so that import fails outright.
+ *
+ * `@tailwind base/components/utilities` below are equivalent in output (Tailwind v3's own
+ * `@tailwind` at-rule is expanded internally by whichever tailwindcss binary is actually running
+ * this build — no filesystem package resolution involved), so this compiles to the same CSS
+ * without needing v3 anywhere on the ancestor path. Filament's own small base.css override is
+ * pulled in via a plain relative import, which never touches node_modules.
+ */
+@tailwind base;
+@import '../../../../vendor/filament/filament/resources/css/base.css';
+@tailwind components;
+@tailwind utilities;
+
+@config 'tailwind.config.js';

@@ -13,25 +13,41 @@ class RevenueChart extends ChartWidget
     protected int | string | array $columnSpan = 'full';
     protected static ?int $sort = 2;
 
+    public ?string $filter = 'this_year';
+
     public static function canView(): bool
     {
         return auth()->user()?->hasAnyRole(['agency_admin', 'accountant']) ?? false;
     }
 
-    // Distinct colors cycled per currency series — extend if a tenant ever runs more than
-    // this many concurrent currencies.
+    // Azure Horizon brand palette — primary Sapphire first (the common single-currency case),
+    // then accent/semantic hues for any additional currency series. Fill opacity sits at the
+    // spec's ~15-20% near-line range. Filament's ChartWidget passes getData() straight through
+    // to Chart.js via a plain @js()-serialized array (see chart-widget.blade.php), so a dataset
+    // can't hand Chart.js a canvas-gradient function from the server side — only a flat color.
+    // This is the closest a config-only change gets to the reference "gradient fading to
+    // transparent" look; a literal top-to-bottom fade would need a Chart.js plugin registered as
+    // its own JS asset, which is out of scope for a widget config change.
     private const SERIES_COLORS = [
-        ['border' => '#ca8a04', 'background' => 'rgba(202, 138, 4, 0.1)'],   // Zatara Gold
-        ['border' => '#2563eb', 'background' => 'rgba(37, 99, 235, 0.1)'],   // Blue
-        ['border' => '#16a34a', 'background' => 'rgba(22, 163, 74, 0.1)'],   // Green
-        ['border' => '#dc2626', 'background' => 'rgba(220, 38, 38, 0.1)'],   // Red
-        ['border' => '#9333ea', 'background' => 'rgba(147, 51, 234, 0.1)'],  // Purple
+        ['border' => '#00355f', 'background' => 'rgba(0, 53, 95, 0.16)'],     // Sapphire (primary)
+        ['border' => '#fe9835', 'background' => 'rgba(254, 152, 53, 0.16)'],  // Sunset Orange (accent)
+        ['border' => '#059669', 'background' => 'rgba(5, 150, 105, 0.16)'],   // Emerald (success)
+        ['border' => '#e11d48', 'background' => 'rgba(225, 29, 72, 0.16)'],   // Rose (danger)
+        ['border' => '#005353', 'background' => 'rgba(0, 83, 83, 0.16)'],     // Deep teal
     ];
+
+    protected function getFilters(): ?array
+    {
+        return [
+            'this_year' => 'هذا العام',
+            'last_year' => 'العام الماضي',
+        ];
+    }
 
     protected function getData(): array
     {
         $tenantId = Filament::getTenant()?->id ?? auth()->user()->tenant_id;
-        $currentYear = Carbon::now()->year;
+        $year = $this->filter === 'last_year' ? Carbon::now()->subYear()->year : Carbon::now()->year;
 
         // Bug fix: this used to sum Payment.amount across ALL currencies into a single line
         // labeled "(SAR)" regardless of what currency the money actually was — silently
@@ -47,7 +63,7 @@ class RevenueChart extends ChartWidget
         // summing, avoiding the raw-integer-cents pitfall documented on DashboardStatsOverview
         // (a query-builder ->sum() bypasses casts entirely).
         $payments = Payment::where('tenant_id', $tenantId)
-            ->whereYear('created_at', $currentYear)
+            ->whereYear('created_at', $year)
             ->get(['amount', 'currency', 'created_at']);
 
         $currencies = $payments->map(fn ($p) => $p->currency ?? 'USD')->unique()->sort()->values();
@@ -70,6 +86,11 @@ class RevenueChart extends ChartWidget
                 'backgroundColor' => $colors['background'],
                 'fill' => true,
                 'tension' => 0.4,
+                'pointBackgroundColor' => $colors['border'],
+                'pointBorderColor' => '#ffffff',
+                'pointBorderWidth' => 1.5,
+                'pointRadius' => 3,
+                'pointHoverRadius' => 5,
             ];
         }
 
@@ -83,6 +104,11 @@ class RevenueChart extends ChartWidget
                 'backgroundColor' => self::SERIES_COLORS[0]['background'],
                 'fill' => true,
                 'tension' => 0.4,
+                'pointBackgroundColor' => self::SERIES_COLORS[0]['border'],
+                'pointBorderColor' => '#ffffff',
+                'pointBorderWidth' => 1.5,
+                'pointRadius' => 3,
+                'pointHoverRadius' => 5,
             ];
         }
 
@@ -96,5 +122,28 @@ class RevenueChart extends ChartWidget
     protected function getType(): string
     {
         return 'line';
+    }
+
+    protected function getOptions(): array | \Filament\Support\RawJs | null
+    {
+        // Vertical gridlines are already off by default in Filament's chart JS
+        // (scales.x.grid.display defaults to false) — only tidying the axis borders here so the
+        // plot reads as a clean, mostly-open canvas per the reference design.
+        return [
+            'scales' => [
+                'x' => [
+                    'border' => ['display' => false],
+                ],
+                'y' => [
+                    'border' => ['display' => false],
+                    'beginAtZero' => true,
+                ],
+            ],
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                ],
+            ],
+        ];
     }
 }

@@ -25,7 +25,7 @@ class BookingResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-ticket';
     
-    protected static ?string $navigationGroup = 'الحجوزات والعملاء';
+    protected static ?string $navigationGroup = 'الحجوزات';
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'pnr';
 
@@ -285,7 +285,7 @@ class BookingResource extends Resource
                                     // VALID-001: Require at least one passenger
                                     ->minItems(1)
                                     ->helperText('يجب إضافة راكب واحد على الأقل لإتمام الحجز')
-                                    ->itemActions([
+                                    ->extraItemActions([
                                         \Filament\Forms\Components\Actions\Action::make('copy_customer')
                                             ->label('نسخ من العميل')
                                             ->icon('heroicon-m-document-duplicate')

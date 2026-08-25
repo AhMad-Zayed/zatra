@@ -19,7 +19,7 @@ class PassengerCategoryResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
     
-    protected static ?string $navigationGroup = 'الإعدادات والإدارة';
+    protected static ?string $navigationGroup = 'الإعدادات';
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool

@@ -18,7 +18,7 @@ class StaffResource extends Resource
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationGroup = 'الإعدادات والإدارة';
+    protected static ?string $navigationGroup = 'الإعدادات';
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'طاقم العمل';
     protected static ?string $modelLabel = 'موظف';

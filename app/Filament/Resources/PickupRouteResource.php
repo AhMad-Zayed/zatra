@@ -18,7 +18,7 @@ class PickupRouteResource extends Resource
     protected static ?string $model = PickupRoute::class;
 
     // LABEL-018: Pure Arabic navigation group (removed 'Logistics' English parenthetical)
-    protected static ?string $navigationGroup = 'اللوجستيات';
+    protected static ?string $navigationGroup = 'الرحلات والفنادق';
     protected static ?int $navigationSort = 1;
 
     public static function getNavigationLabel(): string

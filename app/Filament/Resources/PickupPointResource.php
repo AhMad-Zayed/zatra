@@ -20,7 +20,7 @@ class PickupPointResource extends Resource
     protected static bool $isScopedToTenant = false;
 
     // LABEL-017: Pure Arabic navigation group (removed 'Logistics' English parenthetical)
-    protected static ?string $navigationGroup = 'اللوجستيات';
+    protected static ?string $navigationGroup = 'الرحلات والفنادق';
     protected static ?int $navigationSort = 2;
 
     public static function getNavigationLabel(): string

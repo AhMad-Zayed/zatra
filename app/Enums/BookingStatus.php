@@ -24,11 +24,14 @@ enum BookingStatus: string implements HasLabel, HasColor
 
     public function getColor(): string|array|null
     {
+        // Status-chip colors per the Azure Horizon spec: Confirmed=success, Pending=warning,
+        // Cancelled=gray (terminal/inert, not an alarm — danger is reserved for states that
+        // need action, which a cancelled booking no longer does).
         return match ($this) {
             self::Pending => 'warning',
             self::Confirmed => 'success',
             self::ConfirmedPartial => 'info',
-            self::Cancelled => 'danger',
+            self::Cancelled => 'gray',
         };
     }
 }
