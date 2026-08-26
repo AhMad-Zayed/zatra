@@ -21,6 +21,7 @@ class Booking extends Model implements HasMedia
         'tenant_id',
         'trip_instance_id',
         'package_option_id',
+        'package_price_at_booking',
         'customer_id',
         'user_id',
         'pnr',
@@ -55,6 +56,7 @@ class Booking extends Model implements HasMedia
         'booking_status' => BookingStatus::class,
         'payment_status' => PaymentStatus::class,
         'grand_total' => \App\Casts\MoneyCast::class,
+        'package_price_at_booking' => \App\Casts\MoneyCast::class,
         'discount_amount' => \App\Casts\MoneyCast::class,
         'total_paid' => \App\Casts\MoneyCast::class,
         'balance_due' => \App\Casts\MoneyCast::class,
@@ -83,6 +85,23 @@ class Booking extends Model implements HasMedia
             if (empty($model->uuid)) {
                 $model->uuid = (string) \Illuminate\Support\Str::uuid();
             }
+
+            // Price Integrity Audit, Finding A: captures the PackageOption's per-passenger
+            // price_adjustment at the exact moment a booking is created, so
+            // BookingService::recalculateTotals() (guardrail-protected, one line changed) can
+            // read this frozen value instead of re-reading the package's CURRENT live price on
+            // every later recalculation. Model-level hook rather than a CreateBookingService
+            // edit -- CreateBookingService::execute()'s Booking::create() call runs synchronously
+            // inside the same transaction as the real booking flow, so "the moment this hook
+            // fires" and "the moment of booking" are the same instant for a genuinely new
+            // booking. Guarded so an explicit value (e.g. the backfill migration, or a future
+            // caller with its own reason) is never silently overwritten.
+            // Checked against the RAW attribute, not the MoneyCast accessor -- MoneyCast::get()
+            // returns 0.00 (never actual null) for an unset attribute, so is_null() on the cast
+            // value would never be true and this guard would silently never fire.
+            if ($model->package_option_id && !array_key_exists('package_price_at_booking', $model->getAttributes())) {
+                $model->package_price_at_booking = \App\Models\PackageOption::find($model->package_option_id)?->price_adjustment ?? 0;
+            }
         });
 
         static::updating(function ($model) {
@@ -96,6 +115,7 @@ class Booking extends Model implements HasMedia
                 'snapshot_taxes',
                 'snapshot_discounts',
                 'snapshot_passenger_rules',
+                'package_price_at_booking',
             ];
 
             foreach ($snapshotFields as $field) {

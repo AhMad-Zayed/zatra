@@ -527,7 +527,11 @@ class BookingService
         
         $packageAdjustment = 0.0;
         if ($booking->package_option_id && $booking->packageOption) {
-            $adj = (float) ($booking->packageOption->price_adjustment ?? 0);
+            // Price Integrity Audit, Finding A: was $booking->packageOption->price_adjustment
+            // (a live read) -- corrupted grand_total on every recalculation once the
+            // PackageOption's price changed after booking. package_price_at_booking is the
+            // frozen snapshot, captured once at creation (Booking::creating()).
+            $adj = (float) ($booking->package_price_at_booking ?? 0);
             $packageAdjustment = $adj * $passengers->count();
         }
 
