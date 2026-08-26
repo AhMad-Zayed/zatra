@@ -88,7 +88,14 @@ class CustomerBookingPortal extends Component
         // already assigned to a passenger doesn't fall outside the range as the trip fills up.
         // Which specific numbered seats are taken is tracked separately below, from other
         // passengers' actual seat_number assignments — that part was already correct.
-        $this->totalSeats = $this->booking->tripInstance->available_seats;
+        //
+        // Bus/Fleet redesign Ticket 2: portal_seat_selection_available is false once a trip has
+        // 2+ buses (seat numbers are only unique within one bus, and this picker has no concept
+        // of "which bus") — routes into the exact same "no numbered seat system" path already
+        // used for available_seats === null, so the degraded UI/messaging is shared, not new.
+        $this->totalSeats = $this->booking->tripInstance->portal_seat_selection_available
+            ? $this->booking->tripInstance->available_seats
+            : null;
 
         if ($this->totalSeats !== null) {
             $takenSeats = Passenger::whereHas('booking', fn($q) => $q->where('trip_instance_id', $this->booking->trip_instance_id))
@@ -205,7 +212,13 @@ class CustomerBookingPortal extends Component
 
                     // Double Verification: Is seat valid?
                     if ($requestedSeat) {
-                        if ($tripInstance->available_seats === null) {
+                        // Bus/Fleet redesign Ticket 2: server-side twin of the mount() gate above
+                        // — a stale/tampered request submitting a seat number for a now-multi-bus
+                        // trip must be rejected here too, not just hidden from the UI, since
+                        // available_seats is no longer null for such a trip (it's the summed bus
+                        // capacity), so the old available_seats === null check alone would have
+                        // silently let this through.
+                        if (!$tripInstance->portal_seat_selection_available) {
                             throw new \Exception("لا يوجد نظام تخصيص مقاعد مرقمة لهذه الرحلة.");
                         }
                         if ($requestedSeat < 1 || $requestedSeat > $tripInstance->available_seats) {

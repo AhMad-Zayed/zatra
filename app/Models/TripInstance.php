@@ -121,6 +121,25 @@ class TripInstance extends Model implements HasMedia
     }
 
     /**
+     * Bus/Fleet redesign Ticket 2 — false whenever CustomerBookingPortal's numbered seat-picker
+     * would not be safe/meaningful: no numbered-seat system configured at all (available_seats
+     * null, the pre-existing convention), or 2+ buses assigned. Seat numbers are only unique
+     * WITHIN one bus once a trip has more than one, and the self-service portal has no concept
+     * of "which bus" — so once that ambiguity exists, numbered selection must not be offered;
+     * staff assign seats manually instead (Ticket 3's drag-and-drop UI). Single source of truth
+     * used by both CustomerBookingPortal::mount() (what the customer sees) and ::saveAll() (the
+     * server-side guard against a stale/tampered request bypassing that same UI gate).
+     */
+    public function getPortalSeatSelectionAvailableAttribute(): bool
+    {
+        if ($this->available_seats === null) {
+            return false;
+        }
+
+        return $this->tripBusAssignments()->count() < 2;
+    }
+
+    /**
      * True only if the trip's accommodation catalog actually has at least one active room type
      * AND the tenant-level kill switch (tenants.settings['room_booking_enabled']) is on.
      * Belt-and-suspenders single source of truth for whether room-selection UI/payloads should

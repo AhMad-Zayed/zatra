@@ -33,7 +33,16 @@ class TripInstancesRelationManager extends RelationManager
                 Forms\Components\TextInput::make('available_seats')
                     ->label('المقاعد المتاحة')
                     ->numeric()
-                    ->required(),
+                    ->required()
+                    // Bus/Fleet redesign Ticket 2: same lock as TripInstanceResource's own
+                    // form — once a trip has bus assignments, available_seats is a managed
+                    // value kept in sync by TripFleetService, not hand-edited here.
+                    ->disabled(fn (?\App\Models\TripInstance $record): bool => $record !== null
+                        && app(\App\Services\TripFleetService::class)->hasAnyBusAssignments($record))
+                    ->helperText(fn (?\App\Models\TripInstance $record): ?string => ($record !== null
+                        && app(\App\Services\TripFleetService::class)->hasAnyBusAssignments($record))
+                        ? 'هذه الرحلة تستخدم إدارة الأسطول — السعة محسوبة تلقائياً من الحافلات المخصصة.'
+                        : null),
                 Forms\Components\Select::make('status')
                     ->label('الحالة')
                     ->options([

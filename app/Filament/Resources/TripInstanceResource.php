@@ -108,7 +108,18 @@ class TripInstanceResource extends Resource
                         Forms\Components\TextInput::make('available_seats')
                             ->label('المقاعد المتاحة')
                             ->numeric()
-                            ->required(),
+                            ->required()
+                            // Bus/Fleet redesign Ticket 2: once a trip has bus assignments,
+                            // available_seats is a managed value (kept in sync with the sum of
+                            // those assignments' capacity by TripFleetService) — hand-editing it
+                            // here would just get overwritten on the next bus change, so lock it
+                            // and point staff at the real source instead.
+                            ->disabled(fn (?TripInstance $record): bool => $record !== null
+                                && app(\App\Services\TripFleetService::class)->hasAnyBusAssignments($record))
+                            ->helperText(fn (?TripInstance $record): ?string => ($record !== null
+                                && app(\App\Services\TripFleetService::class)->hasAnyBusAssignments($record))
+                                ? 'هذه الرحلة تستخدم إدارة الأسطول — السعة محسوبة تلقائياً من الحافلات المخصصة (تخصيص الحافلات).'
+                                : null),
                         Forms\Components\Select::make('status')
                             ->label('حالة الرحلة')
                             ->options([

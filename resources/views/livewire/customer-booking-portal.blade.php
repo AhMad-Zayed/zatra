@@ -217,6 +217,17 @@
                         @endforeach
                     </div>
 
+                    @if(!$totalSeats)
+                        <!-- No numbered seat system for this trip (either not configured, or
+                        the trip now has multiple buses and self-service selection can't safely
+                        disambiguate which bus — Bus/Fleet redesign Ticket 2). Staff assign
+                        seats manually instead. -->
+                        <div class="max-w-md mx-auto bg-blue-50 border border-blue-100 text-blue-800 rounded-2xl p-8 text-center">
+                            <span class="material-symbols-outlined text-4xl text-blue-400">event_seat</span>
+                            <p class="mt-3 font-medium">سيتم تخصيص مقعدك من قبل فريق العمل</p>
+                            <p class="mt-1 text-sm text-blue-600">لا حاجة لاختيار رقم مقعد لهذه الرحلة — يمكنك المتابعة مباشرة.</p>
+                        </div>
+                    @else
                     <!-- Legend -->
                     <div class="flex justify-center gap-6 text-sm mb-6 bg-slate-50 py-3 rounded-2xl border border-slate-100">
                         <div class="flex items-center gap-2">
@@ -293,6 +304,7 @@
                             @endfor
                         </div>
                     </div>
+                    @endif
 
                     <div class="flex justify-between mt-10">
                         <button wire:click="previousStep" class="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-full hover:bg-slate-50 transition-colors focus:outline-none">
