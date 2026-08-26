@@ -39,7 +39,13 @@ class WaitingListsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('customer_name')
-            ->defaultSort('created_at', 'asc')
+            // CRITICAL FIX: this relationship joins trip_instance_waiting_list (the pivot) with
+            // waiting_lists, and BOTH tables have a created_at column -- an unqualified
+            // defaultSort('created_at', 'asc') is ambiguous under MySQL (which rejects the query
+            // outright) though SQLite tolerates it silently, which is why this was invisible to
+            // the test suite (runs on SQLite) despite crashing this entire table in real
+            // production use.
+            ->defaultSort('waiting_lists.created_at', 'asc')
             ->columns([
                 Tables\Columns\TextColumn::make('customer_name')
                     ->label('الاسم')
@@ -153,6 +159,18 @@ class WaitingListsRelationManager extends RelationManager
                                 ->success()
                                 ->send();
                         });
+                    }),
+
+                Tables\Actions\Action::make('convert_to_different_trip')
+                    ->label('تحويل لحجز على رحلة أخرى')
+                    ->icon('heroicon-o-arrow-path-rounded-square')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalDescription('سيتم إنشاء حجز جديد لهذا العميل على الرحلة المختارة، وتحديد طلب الانتظار كمحوّل لحجز.')
+                    ->visible(fn ($record) => in_array($record->status, [WaitingListStatusEnum::Pending, WaitingListStatusEnum::Notified]))
+                    ->form(\App\Filament\Support\WaitlistConversionForm::schema())
+                    ->action(function (array $data, $record) {
+                        \App\Filament\Support\WaitlistConversionForm::handle($data, $record);
                     }),
 
                 Tables\Actions\Action::make('cancel_request')

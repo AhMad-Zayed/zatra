@@ -73,9 +73,14 @@ class WaitingListResource extends Resource
                 Forms\Components\Select::make('status')
                     ->label('الحالة')
                     ->options([
+                        // FIX: this used to save 'converted_to_booking', which doesn't match any
+                        // WaitingListStatusEnum case (the real one is 'converted') -- a manual
+                        // status edit here would write an invalid enum value that throws when
+                        // the record is next hydrated. Matches the already-correct value used in
+                        // WaitingListsRelationManager.
                         'pending' => 'في الانتظار',
                         'notified' => 'تم التبليغ',
-                        'converted_to_booking' => 'تحول لحجز',
+                        'converted' => 'تحول لحجز',
                         'expired' => 'منتهي / ملغي',
                     ])
                     ->required()
@@ -111,13 +116,13 @@ class WaitingListResource extends Resource
                     ->formatStateUsing(fn ($state) => match ($state?->value ?? $state) {
                         'pending' => 'في الانتظار',
                         'notified' => 'تم التبليغ',
-                        'converted_to_booking' => 'تحول لحجز',
+                        'converted' => 'تحول لحجز',
                         'expired' => 'منتهي / ملغي',
                         default => $state?->value ?? $state,
                     })
                     ->colors([
                         'warning' => 'pending',
-                        'success' => fn ($state) => in_array($state?->value ?? $state, ['notified', 'converted_to_booking']),
+                        'success' => fn ($state) => in_array($state?->value ?? $state, ['notified', 'converted']),
                         'danger' => 'expired',
                     ]),
                 Tables\Columns\TextColumn::make('notified_at')
@@ -133,6 +138,17 @@ class WaitingListResource extends Resource
                 //
             ])
             ->actions([
+                Tables\Actions\Action::make('convert_to_different_trip')
+                    ->label('تحويل لحجز على رحلة أخرى')
+                    ->icon('heroicon-o-arrow-path-rounded-square')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalDescription('سيتم إنشاء حجز جديد لهذا العميل على الرحلة المختارة، وتحديد طلب الانتظار كمحوّل لحجز.')
+                    ->visible(fn (WaitingList $record) => in_array($record->status, [\App\Enums\WaitingListStatusEnum::Pending, \App\Enums\WaitingListStatusEnum::Notified]))
+                    ->form(\App\Filament\Support\WaitlistConversionForm::schema())
+                    ->action(function (array $data, WaitingList $record) {
+                        \App\Filament\Support\WaitlistConversionForm::handle($data, $record);
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([

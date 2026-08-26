@@ -89,6 +89,7 @@ class ActivityLogResource extends Resource
                         \App\Models\TripInstance::class => 'رحلة مجدولة #' . $record->subject_id,
                         \App\Models\TripTemplate::class => 'قالب رحلة #' . $record->subject_id,
                         \App\Models\Passenger::class => 'مسافر #' . $record->subject_id,
+                        \App\Models\WaitingList::class => 'طلب انتظار #' . $record->subject_id,
                         default => class_basename($record->subject_type) . " (#{$record->subject_id})",
                     } : '-')
                     ->searchable(),
