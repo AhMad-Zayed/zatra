@@ -23,6 +23,18 @@ class StaffResource extends Resource
     protected static ?string $navigationLabel = 'طاقم العمل';
     protected static ?string $modelLabel = 'موظف';
     protected static ?string $pluralModelLabel = 'طاقم العمل';
+
+    /**
+     * @return array<string, string>
+     */
+    protected static function roleLabels(): array
+    {
+        return [
+            'agency_admin' => 'مدير الوكالة',
+            'accountant' => 'محاسب',
+            'booking_agent' => 'موظف حجوزات',
+        ];
+    }
     protected static ?string $tenantOwnershipRelationshipName = 'tenants';
 
     public static function canAccess(): bool
@@ -81,7 +93,10 @@ class StaffResource extends Resource
                             ->relationship('roles', 'name')
                             ->pivotData(fn () => ['tenant_id' => \Filament\Facades\Filament::getTenant()?->id])
                             ->options(function () {
-                                return Role::whereIn('name', ['agency_admin', 'accountant', 'booking_agent'])->pluck('name', 'id');
+                                return Role::whereIn('name', ['agency_admin', 'accountant', 'booking_agent'])
+                                    ->pluck('name', 'id')
+                                    ->map(fn (string $name) => static::roleLabels()[$name] ?? $name)
+                                    ->toArray();
                             })
                             ->required(),
                     ])->columns(2),
@@ -101,6 +116,7 @@ class StaffResource extends Resource
                 Tables\Columns\TextColumn::make('roles.name')
                     ->label('الصلاحيات')
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => static::roleLabels()[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {
                         'agency_admin' => 'danger',
                         'accountant' => 'warning',
