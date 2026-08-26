@@ -206,4 +206,93 @@ class PackagePriceSnapshotTest extends TestCase
 
         $this->assertSame(7500, (int) DB::table('bookings')->where('id', $bookingId)->value('package_price_at_booking'));
     }
+
+    // ------------------------------------------------------------------
+    // Detecting (not silently assuming clean) pre-existing corruption
+    // ------------------------------------------------------------------
+
+    public function test_backfill_flags_and_logs_a_booking_with_signs_of_prior_corruption_but_still_derives_a_value(): void
+    {
+        $f = $this->makeFixture('009', packageAdjustment: 75);
+
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->dropColumn('package_price_at_booking');
+        });
+
+        $bookingCreatedAt = now()->subDays(10);
+        $packageUpdatedAt = now()->subDays(5);   // package touched AFTER booking created
+        $bookingUpdatedAt = now()->subDays(1);   // booking touched AGAIN after that -- the risk signal
+
+        $bookingId = DB::table('bookings')->insertGetId([
+            'tenant_id' => $f['tenant']->id, 'trip_instance_id' => $f['instance']->id, 'customer_id' => $f['customer']->id,
+            'package_option_id' => $f['package']->id, 'pnr' => 'BACKFILL-RISK', 'currency' => 'USD',
+            'booking_status' => 'confirmed', 'payment_status' => 'unpaid',
+            'grand_total' => 17500, 'balance_due' => 17500, 'discount_amount' => 0,
+            'created_at' => $bookingCreatedAt, 'updated_at' => $bookingUpdatedAt,
+        ]);
+        DB::table('passengers')->insert([
+            'tenant_id' => $f['tenant']->id, 'booking_id' => $bookingId, 'trip_passenger_category_id' => $f['cat']->id,
+            'price_at_booking' => 10000, 'data_complete' => true, 'requirements_complete' => true,
+            'created_at' => $bookingCreatedAt, 'updated_at' => $bookingCreatedAt,
+        ]);
+        DB::table('package_options')->where('id', $f['package']->id)->update(['updated_at' => $packageUpdatedAt]);
+
+        \Illuminate\Support\Facades\Log::spy();
+
+        $migration = require database_path('migrations/2026_09_04_000001_add_package_price_at_booking_to_bookings_table.php');
+        $migration->up();
+
+        // Still derives and freezes a value -- NOT left null (see the migration's own docblock
+        // for why null would be strictly worse: recalculateTotals() treats null as 0, silently
+        // dropping the whole package charge on the next recalculation).
+        $this->assertSame(7500, (int) DB::table('bookings')->where('id', $bookingId)->value('package_price_at_booking'));
+
+        \Illuminate\Support\Facades\Log::shouldHaveReceived('warning')
+            ->withArgs(function (string $message, array $context) use ($bookingId, $f) {
+                return str_contains($message, 'possible pre-fix grand_total corruption')
+                    && $context['booking_id'] === $bookingId
+                    && $context['tenant_id'] === $f['tenant']->id
+                    && $context['package_option_id'] === $f['package']->id;
+            })
+            ->once();
+    }
+
+    public function test_backfill_does_not_flag_a_booking_whose_package_was_never_touched_after_creation(): void
+    {
+        $f = $this->makeFixture('010', packageAdjustment: 75);
+
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->dropColumn('package_price_at_booking');
+        });
+
+        // Fully explicit, unambiguous ordering: package created/touched first, booking created
+        // and (harmlessly, for an unrelated reason) updated afterward -- but the package was
+        // never touched again after the booking existed, so this must NOT be flagged.
+        $packageUpdatedAt = now()->subDays(10);
+        $bookingCreatedAt = now()->subDays(5);
+        $bookingUpdatedAt = now()->subDays(1);
+
+        DB::table('package_options')->where('id', $f['package']->id)->update(['updated_at' => $packageUpdatedAt]);
+
+        $bookingId = DB::table('bookings')->insertGetId([
+            'tenant_id' => $f['tenant']->id, 'trip_instance_id' => $f['instance']->id, 'customer_id' => $f['customer']->id,
+            'package_option_id' => $f['package']->id, 'pnr' => 'BACKFILL-CLEAN', 'currency' => 'USD',
+            'booking_status' => 'confirmed', 'payment_status' => 'unpaid',
+            'grand_total' => 17500, 'balance_due' => 17500, 'discount_amount' => 0,
+            'created_at' => $bookingCreatedAt, 'updated_at' => $bookingUpdatedAt,
+        ]);
+        DB::table('passengers')->insert([
+            'tenant_id' => $f['tenant']->id, 'booking_id' => $bookingId, 'trip_passenger_category_id' => $f['cat']->id,
+            'price_at_booking' => 10000, 'data_complete' => true, 'requirements_complete' => true,
+            'created_at' => $bookingCreatedAt, 'updated_at' => $bookingCreatedAt,
+        ]);
+
+        \Illuminate\Support\Facades\Log::spy();
+
+        $migration = require database_path('migrations/2026_09_04_000001_add_package_price_at_booking_to_bookings_table.php');
+        $migration->up();
+
+        $this->assertSame(7500, (int) DB::table('bookings')->where('id', $bookingId)->value('package_price_at_booking'));
+        \Illuminate\Support\Facades\Log::shouldNotHaveReceived('warning');
+    }
 }

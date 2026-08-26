@@ -126,15 +126,53 @@ either file without checking.
   label instead of the addon's real name. Neither is a price-integrity issue (this document
   doesn't display price at all), just a display quirk affecting every real generated ticket.
 
+## Price Integrity Audit, Finding A: package-price corruption — fixed going forward, residual risk on historical data documented
+
+**Found**: 2026-08/09. **Fixed** (for every booking going forward, and for any historical booking
+this migration can positively confirm is clean): same session, via the new
+`package_price_at_booking` snapshot column, a `Booking::creating()` hook, and a one-line change to
+the guardrail-protected `recalculateTotals()`. Not moved to the fully-resolved list below because
+of a genuine, honestly-documented residual limitation raised on review — see below.
+
+`BookingService::recalculateTotals()` read `$booking->packageOption->price_adjustment` live
+instead of a stored snapshot, corrupting the stored `grand_total` column on nearly every
+subsequent booking mutation once a `PackageOption`'s price changed after booking (confirmed live:
+a real booking went from `grand_total` 150 to 600 after a live price change + one new payment).
+
+**The backfill migration for historical bookings back-derives `package_price_at_booking`
+arithmetically from each booking's own already-stored `grand_total`** (solving
+`recalculateTotals()`'s own total formula for the package term). This is exact **only if that
+booking's `grand_total` was never actually corrupted by the bug before this fix landed** — i.e.
+only if the `PackageOption`'s live price never changed after that booking existed, or it did but
+no `recalculateTotals()`-triggering event (payment, passenger add/cancel, reopen) ever ran
+afterward. `PackageOption` has no `LogsActivity` / price-history mechanism at all (confirmed) — so
+for any booking where corruption already happened, **the true original per-passenger package
+price is genuinely unrecoverable from any data that exists**, not merely hard to find.
+
+Checked directly (not assumed) whether this is a live concern: the real dev database has **zero**
+bookings with a `package_option_id` set at all, so the corruption-before-fix scenario has never
+actually been exercised there. For production (or any environment with real package-bearing
+bookings), the migration now **detects and flags** at-risk bookings rather than silently treating
+every historical booking as clean: `package.updated_at > booking.created_at AND booking.updated_at
+> package.updated_at` (recalculateTotals() always bumps `bookings.updated_at`, even via
+`updateQuietly()`, which only suppresses model events, not timestamps) flags "this booking's total
+was touched again after its package was modified post-booking" — a necessary, checkable condition
+for the corruption, logged in full detail (`Log::warning`, booking id, tenant, package id, all
+three timestamps) for manual review. A flagged booking still gets the same derive-and-freeze
+treatment as a clean one (deriving and freezing is the least-bad available action either way —
+leaving it null would be strictly worse, since `recalculateTotals()` treats null as 0 and would
+silently drop the whole package charge on the next recalculation); what changes is that a human
+gets visibility into which specific historical bookings cannot be mechanically verified as
+correct, rather than every booking being silently treated as trustworthy.
+
+**If this audit is ever run against a real production database with package-bearing bookings that
+predate this fix, any `Log::warning` entries with `Price Integrity Audit backfill` in the message
+should be manually reviewed** — those are the specific bookings where the derived
+`package_price_at_booking` (and therefore `grand_total`) may not reflect what the customer
+actually agreed to, and there is no way to recover the true original value.
+
 ## Already resolved this session (listed here for context, not action items)
 
-- Price Integrity Audit, Finding A: `BookingService::recalculateTotals()` read
-  `$booking->packageOption->price_adjustment` live instead of a stored snapshot, corrupting the
-  stored `grand_total` column on nearly every subsequent booking mutation once a `PackageOption`'s
-  price changed after booking (confirmed live: a real booking went from grand_total 150 to 600
-  after a live price change + one new payment) — fixed via the new `package_price_at_booking`
-  snapshot column, a `Booking::creating()` hook, and a one-line change to the guardrail-protected
-  `recalculateTotals()`.
 - Price Integrity Audit, Finding B/C: the customer's "My Bookings" page, the magic-link portal,
   and the admin bookings table all displayed a booking's trip title/dates via a live join through
   `tripInstance->tripTemplate`, bypassing the already-correctly-populated
