@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\TripTypeEnum;
 use App\Filament\Pages\PhoneBookingPage;
-use App\Filament\Pages\QuickBookingPage;
 use App\Filament\Resources\BookingResource\Pages\CreateBooking;
 use App\Livewire\CheckoutWizard;
 use App\Livewire\CustomerBookingPortal;
@@ -32,10 +31,11 @@ use Tests\TestCase;
  *  A. TripTypeEnum + trip_type (classification only, no automatic business logic).
  *  B. RequirementValidationService::findMissingRequirements() (fixing the field-mapping the
  *     dead CustomerBookingPortal::validatePassengers() `in_array()` check was reaching for).
- *  C. Enforcement wired into all 4 booking-creation entry points — strict (CheckoutWizard,
- *     text/date only) vs. permissive (QuickBookingPage/PhoneBookingPage/admin Create Booking),
- *     and per-passenger requirements_complete tracking (all item types, everywhere) regardless
- *     of strict/permissive outcome.
+ *  C. Enforcement wired into all 3 booking-creation entry points — strict (CheckoutWizard,
+ *     text/date only) vs. permissive (PhoneBookingPage/admin Create Booking — QuickBookingPage
+ *     retired, its coverage was equivalent to admin Create Booking's below), and per-passenger
+ *     requirements_complete tracking (all item types, everywhere) regardless of strict/permissive
+ *     outcome.
  *  D. CustomerBookingPortal::validatePassengers() actually enforcing now.
  *  E. requirements_complete cleared automatically once a document is uploaded post-booking.
  */
@@ -330,51 +330,6 @@ class TripTypeAndRequirementEnforcementTest extends TestCase
             Booking::first()->passengers()->first()->requirements_complete,
             'A passenger that passed strict text/date validation must still be flagged incomplete while an image item is outstanding.'
         );
-    }
-
-    public function test_quick_booking_page_never_blocks_but_flags_and_notifies_on_missing_requirements(): void
-    {
-        $f = $this->makeFixture('c06', ['text']);
-        $admin = $this->makeAgencyAdmin($f['tenant'], '0791199006');
-        $this->actingAs($admin);
-        Filament::setTenant($f['tenant'], true);
-
-        $component = Livewire::test(QuickBookingPage::class)
-            ->set('customer_id', $f['customer']->id)
-            ->set('trip_instance_id', $f['instance']->id)
-            ->set('passengers', [[
-                'first_name' => 'Sam', 'last_name' => 'Agent',
-                'document_type' => 'national_id', 'document_number' => '', // left blank
-                'trip_passenger_category_id' => $f['cat']->id,
-            ]])
-            ->set('payment_method', 'cash')
-            ->call('submitBooking');
-
-        $bookingId = $component->get('booking_id');
-        $this->assertNotNull($bookingId, 'Missing requirements must never block a staff booking.');
-        $this->assertFalse(Booking::find($bookingId)->passengers()->first()->requirements_complete);
-        $component->assertNotified('تنبيه: بيانات ناقصة');
-    }
-
-    public function test_quick_booking_page_does_not_notify_when_requirements_satisfied(): void
-    {
-        $f = $this->makeFixture('c07', ['text']);
-        $admin = $this->makeAgencyAdmin($f['tenant'], '0791199007');
-        $this->actingAs($admin);
-        Filament::setTenant($f['tenant'], true);
-
-        $component = Livewire::test(QuickBookingPage::class)
-            ->set('customer_id', $f['customer']->id)
-            ->set('trip_instance_id', $f['instance']->id)
-            ->set('passengers', [[
-                'first_name' => 'Sam', 'last_name' => 'Agent',
-                'document_type' => 'national_id', 'document_number' => '12345',
-                'trip_passenger_category_id' => $f['cat']->id,
-            ]])
-            ->set('payment_method', 'cash')
-            ->call('submitBooking');
-
-        $component->assertNotNotified('تنبيه: بيانات ناقصة');
     }
 
     public function test_phone_booking_page_never_blocks_and_flags_incomplete_placeholder_passengers(): void

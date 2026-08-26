@@ -77,7 +77,10 @@ class BookingResource extends Resource
                                     ->getOptionLabelFromRecordUsing(fn (\Illuminate\Database\Eloquent\Model $record) => "{$record->name} - {$record->phone}")
                                     // LABEL-001: Removed English parenthetical
                                     ->label('العميل الرئيسي')
-                                    ->searchable()
+                                    // Search both name and phone — bare ->searchable() on a
+                                    // relationship select only searches the titleAttribute
+                                    // ('phone'), so staff couldn't find a customer by name.
+                                    ->searchable(['name', 'phone'])
                                     ->required()
                                     ->createOptionForm([
                                         Forms\Components\TextInput::make('name')
@@ -282,6 +285,8 @@ class BookingResource extends Resource
                             ->schema([
                                 Forms\Components\Repeater::make('passengers')
                                     ->relationship()
+                                    ->label('')
+                                    ->addActionLabel('إضافة راكب')
                                     // VALID-001: Require at least one passenger
                                     ->minItems(1)
                                     ->helperText('يجب إضافة راكب واحد على الأقل لإتمام الحجز')
@@ -379,6 +384,8 @@ class BookingResource extends Resource
                             ->schema([
                                 Forms\Components\Repeater::make('bookingAddons')
                                     ->relationship()
+                                    ->label('')
+                                    ->addActionLabel('إضافة خدمة')
                                     ->schema([
                                         Forms\Components\Select::make('passenger_id')
                                             ->label('المسافر (اختياري)')

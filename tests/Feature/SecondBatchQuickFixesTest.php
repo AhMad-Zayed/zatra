@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentType;
 use App\Enums\WaitingListStatusEnum;
-use App\Filament\Pages\QuickBookingPage;
+use App\Filament\Resources\BookingResource\Pages\CreateBooking;
 use App\Filament\Resources\TripInstanceResource;
 use App\Filament\Resources\TripInstanceResource\RelationManagers\PackageOptionsRelationManager;
 use App\Filament\Resources\TripTemplateResource\Pages\EditTripTemplate;
@@ -42,7 +42,9 @@ use Tests\TestCase;
  *  4. ProcessWaitingListJob / waitinglist:sweep deleted.
  *  5. BookingObserver's dead cancellation branch removed.
  *  6. Duplicate embedded PackageOption repeater removed from TripInstancesRelationManager.
- *  7. QuickBookingPage's payment step actually recording a payment.
+ *  7. Admin Create Booking's payment step actually recording a payment
+ *     (originally caught via QuickBookingPage, since retired/consolidated
+ *     into the Create Booking wizard).
  *  8. Waitlist-to-booking conversion reusing the waitlist's hold, and ReleaseWaitlistHold no
  *     longer overwriting an already-Converted waiting list entry.
  */
@@ -329,38 +331,44 @@ class SecondBatchQuickFixesTest extends TestCase
     }
 
     // ------------------------------------------------------------------
-    // 7. QuickBookingPage payment wiring
+    // 7. Admin Create Booking wizard payment wiring (formerly tested via the
+    //    now-retired QuickBookingPage — same CreateBookingService::execute()
+    //    call, same initial-deposit code path, just reached through the
+    //    consolidated wizard instead of a separate page). Uses the same
+    //    reflection-based approach as AdminBookingTest / the requirements-
+    //    enforcement suite for this exact page — full Filament panel/form
+    //    (fillForm() against a ->relationship() Repeater) isn't wired up for
+    //    this resource in this test environment.
     // ------------------------------------------------------------------
 
-    public function test_quick_booking_page_records_payment_for_selected_method(): void
+    public function test_create_booking_wizard_records_payment_for_selected_method(): void
     {
         $f = $this->makeFixture('008', price: 75.00);
         $admin = $this->makeAgencyAdmin($f['tenant'], '0791100008');
         $this->actingAs($admin);
         Filament::setTenant($f['tenant'], true);
 
-        $component = Livewire::test(QuickBookingPage::class)
-            ->set('customer_id', $f['customer']->id)
-            ->set('trip_instance_id', $f['instance']->id)
-            ->set('passengers', [[
-                'first_name' => 'Sam',
-                'last_name' => 'Agent',
-                'document_type' => 'national_id',
-                'document_number' => '999',
-                'trip_passenger_category_id' => $f['cat']->id,
-            ]])
-            ->set('payment_method', 'transfer')
-            ->call('submitBooking');
+        $page = new CreateBooking();
+        $method = new \ReflectionMethod($page, 'handleRecordCreation');
+        $method->setAccessible(true);
 
-        $bookingId = $component->get('booking_id');
-        $this->assertNotNull($bookingId, 'Booking must have been created.');
+        $booking = $method->invoke($page, [
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'customer_id' => $f['customer']->id,
+            'user_id' => $admin->id,
+            'passengers' => [
+                ['trip_passenger_category_id' => $f['cat']->id, 'first_name' => 'Sam', 'last_name' => 'Agent'],
+            ],
+            'initial_payment_amount' => 75.00,
+            'initial_payment_method' => 'bank_transfer',
+        ]);
 
-        $booking = Booking::find($bookingId);
         $payment = $booking->payments()->first();
 
         $this->assertNotNull($payment, 'Selecting a payment method must actually create a Payment row.');
         $this->assertEquals(75.00, $payment->amount);
-        $this->assertEquals('transfer', $payment->payment_method);
+        $this->assertEquals('bank_transfer', $payment->payment_method);
         $this->assertEquals(PaymentType::FULL, $payment->type);
         $this->assertEquals(75.00, $booking->fresh()->total_paid);
         $this->assertEquals(BookingStatus::Confirmed, $booking->fresh()->booking_status);
