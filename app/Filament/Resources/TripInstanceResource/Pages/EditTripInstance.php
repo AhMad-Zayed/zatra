@@ -26,6 +26,12 @@ class EditTripInstance extends EditRecord
                 ->color('primary')
                 ->url(fn (\App\Models\TripInstance $record): string => TripInstanceResource::getUrl('assign-rooms', ['record' => $record])),
 
+            Actions\Action::make('assign_buses')
+                ->label('تخصيص الحافلات')
+                ->icon('heroicon-o-truck')
+                ->color('primary')
+                ->url(fn (\App\Models\TripInstance $record): string => TripInstanceResource::getUrl('assign-buses', ['record' => $record])),
+
             Actions\Action::make('copy_guide_link')
                 ->label('نسخ رابط المرشد')
                 ->icon('heroicon-o-link')

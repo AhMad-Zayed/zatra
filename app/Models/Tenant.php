@@ -115,4 +115,10 @@ class Tenant extends Model implements HasMedia
     {
         return $this->hasMany(Hotel::class);
     }
+
+    // Bus/Fleet redesign Ticket 1 — same reason as hotels() above, for VehicleResource.
+    public function vehicles(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Vehicle::class);
+    }
 }

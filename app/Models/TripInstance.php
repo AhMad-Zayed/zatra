@@ -113,6 +113,13 @@ class TripInstance extends Model implements HasMedia
         return $this->hasMany(TripStayLeg::class)->orderBy('sequence');
     }
 
+    // Bus/Fleet redesign Ticket 1 — additive, alongside the columns/relations above. Multiple
+    // rows here per trip is what supports assigning more than one bus to the same trip.
+    public function tripBusAssignments(): HasMany
+    {
+        return $this->hasMany(TripBusAssignment::class)->orderBy('sort_order');
+    }
+
     /**
      * True only if the trip's accommodation catalog actually has at least one active room type
      * AND the tenant-level kill switch (tenants.settings['room_booking_enabled']) is on.
