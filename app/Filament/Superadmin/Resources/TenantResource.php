@@ -29,7 +29,19 @@ class TenantResource extends Resource
                 Forms\Components\TextInput::make('slug')
                     ->required()
                     ->unique(ignoreRecord: true)
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Case-Insensitive Uniqueness Fix: unlike TripTemplate.slug (always
+                    // machine-generated via Str::slug(), no manual entry point at all), this
+                    // field is manually typed by a super-admin with no auto-slugify -- the
+                    // existing ->unique() above inherits the SQLite/MySQL collation split like
+                    // everywhere else in this audit. No tenant scoping here: Tenant is the
+                    // top-level entity, slugs must be globally unique.
+                    ->rules(fn (?\App\Models\Tenant $record) => [
+                        new \App\Rules\CaseInsensitiveUnique(
+                            table: 'tenants',
+                            ignoreId: $record?->id,
+                        ),
+                    ]),
                 Forms\Components\TextInput::make('domain')
                     ->nullable()
                     ->unique(ignoreRecord: true)

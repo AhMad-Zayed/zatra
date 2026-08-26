@@ -29,9 +29,15 @@ class SocialAuthController extends Controller
             return redirect()->route('storefront.catalog', ['tenant' => $tenant->slug])->with('error', 'Authentication failed');
         }
 
+        // Case-Insensitive Uniqueness Fix: Customer::booted() normalizes email on write, but a
+        // raw where() search array bypasses model hooks entirely -- the search input itself must
+        // be lowercased here too, or a provider email differing only in case from an existing
+        // (now-normalized) row would silently fail to match and create a duplicate.
+        $socialEmail = \Illuminate\Support\Str::lower(trim($socialUser->getEmail()));
+
         // Prevent duplicates by checking if email exists in THIS tenant
         $customer = Customer::where('tenant_id', $tenant->id)
-                    ->where('email', $socialUser->getEmail())
+                    ->where('email', $socialEmail)
                     ->first();
 
         if ($customer && $customer->provider_id !== null && $customer->provider_id !== $socialUser->getId()) {
@@ -44,7 +50,7 @@ class SocialAuthController extends Controller
             // create and link immediately.
             $customer = Customer::create([
                 'tenant_id' => $tenant->id,
-                'email' => $socialUser->getEmail(),
+                'email' => $socialEmail,
                 'name' => $socialUser->getName() ?? 'عميل',
                 'provider_id' => $socialUser->getId(),
                 'provider_name' => $provider,

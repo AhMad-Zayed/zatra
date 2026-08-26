@@ -55,7 +55,18 @@ class PassengerCategoryResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->label('الاسم (مثال: بالغ، طفل)')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Case-Insensitive Uniqueness Fix: neither this field nor the DB constraint
+                    // it backs (still named global_pricing_tiers_tenant_id_name_unique after
+                    // the table's rename to passenger_categories) had ANY form-level uniqueness
+                    // check before this.
+                    ->rules(fn (?PassengerCategory $record) => [
+                        new \App\Rules\CaseInsensitiveUnique(
+                            table: 'passenger_categories',
+                            tenantId: \Filament\Facades\Filament::getTenant()?->id,
+                            ignoreId: $record?->id,
+                        ),
+                    ]),
                 Forms\Components\TextInput::make('default_price')
                     ->label('السعر الافتراضي')
                     ->numeric()

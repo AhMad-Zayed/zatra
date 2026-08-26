@@ -38,6 +38,17 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Case-Insensitive Uniqueness Fix: same normalization as Customer::booted() -- see that
+        // model's comment for the full rationale and the firstOrCreate() search-array caveat.
+        static::saving(function ($user) {
+            if (!empty($user->email)) {
+                $user->email = \Illuminate\Support\Str::lower(trim($user->email));
+            }
+        });
+    }
+
     public function tenants(): BelongsToMany
     {
         return $this->belongsToMany(Tenant::class);

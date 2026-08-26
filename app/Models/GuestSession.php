@@ -21,6 +21,19 @@ class GuestSession extends Model
         'expires_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        // Case-Insensitive Uniqueness Fix: normalized here (not just on Customer) so
+        // CreateBookingService::execute() -- guardrail-protected, not modified -- reads an
+        // already-lowercase $guestSession->email when it builds Customer::firstOrCreate()'s
+        // search criteria. Same rationale as Customer::booted()/User::booted().
+        static::saving(function ($session) {
+            if (!empty($session->email)) {
+                $session->email = \Illuminate\Support\Str::lower(trim($session->email));
+            }
+        });
+    }
+
     public function hold()
     {
         return $this->belongsTo(\App\Models\InventoryLedger::class, 'hold_id');

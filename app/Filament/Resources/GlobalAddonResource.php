@@ -55,7 +55,18 @@ class GlobalAddonResource extends Resource
                 Forms\Components\TextInput::make('name')
                     ->label('الاسم (مثال: غرفة مفردة)')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    // Case-Insensitive Uniqueness Fix: neither this field nor the DB constraint
+                    // it backs had ANY form-level uniqueness check before this -- the DB
+                    // constraint alone used to be the only thing catching a duplicate, with a
+                    // raw QueryException instead of a friendly validation message.
+                    ->rules(fn (?GlobalAddon $record) => [
+                        new \App\Rules\CaseInsensitiveUnique(
+                            table: 'global_addons',
+                            tenantId: \Filament\Facades\Filament::getTenant()?->id,
+                            ignoreId: $record?->id,
+                        ),
+                    ]),
                 Forms\Components\TextInput::make('default_price')
                     ->label('السعر الافتراضي')
                     ->numeric()
