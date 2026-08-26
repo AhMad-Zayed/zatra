@@ -532,6 +532,7 @@ class TripInstanceResource extends Resource
             'index' => Pages\ListTripInstances::route('/'),
             'create' => Pages\CreateTripInstance::route('/create'),
             'edit' => Pages\EditTripInstance::route('/{record}/edit'),
+            'assign-rooms' => Pages\AssignRooms::route('/{record}/assign-rooms'),
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -50,5 +51,16 @@ class RoomType extends Model
     public function tripStayLegHotelOption(): BelongsTo
     {
         return $this->belongsTo(TripStayLegHotelOption::class);
+    }
+
+    // Ticket 3 additions — purely new accessors, no change to what this model already did.
+    public function roomInstances(): HasMany
+    {
+        return $this->hasMany(RoomInstance::class)->orderBy('room_number');
+    }
+
+    public function bookingRoomSelections(): HasMany
+    {
+        return $this->hasMany(BookingRoomSelection::class);
     }
 }

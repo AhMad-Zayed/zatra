@@ -87,6 +87,10 @@ Route::get('/admin/trip-instances/{tripInstance}/manifest', [\App\Http\Controlle
     ->name('trip-instance.manifest')
     ->middleware(['web', 'auth']);
 
+Route::get('/admin/hotel-options/{hotelOption}/rooming-list', [\App\Http\Controllers\RoomingListController::class, 'generate'])
+    ->name('hotel-option.rooming-list')
+    ->middleware(['web', 'auth']);
+
 // --- MAGIC LOGIN ROUTE ---
 Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
     if (!$request->hasValidSignature()) {

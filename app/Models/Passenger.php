@@ -85,4 +85,10 @@ class Passenger extends Model implements HasMedia
     {
         return $this->belongsTo(TripPassengerCategory::class, 'trip_passenger_category_id');
     }
+
+    // Hotel/Rooming redesign Ticket 3 — purely additive accessor, no change to existing behavior.
+    public function roomAssignment(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(RoomAssignment::class);
+    }
 }
