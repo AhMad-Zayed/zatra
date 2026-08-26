@@ -37,6 +37,12 @@ class WaitingListResource extends Resource
                     ->label('الرحلات المطلوبة')
                     ->relationship('tripInstances', 'id') // Required for belongsToMany sync
                     ->options(fn () => \App\Models\TripInstance::with('tripTemplate')
+                        // CRITICAL FIX: TripInstance has no BelongsToTenant global scope, so this
+                        // picker was showing (and letting staff pick) trip instances belonging to
+                        // OTHER tenants -- a cross-tenant data leak. Explicit tenant filter,
+                        // matching the isolation convention every guardrail-protected service
+                        // already follows.
+                        ->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id)
                         ->where('start_date', '>=', now()) // Only upcoming trips
                         ->get()
                         ->mapWithKeys(fn ($t) => [$t->id => $t->tripTemplate?->title . ' — ' . $t->start_date?->format('Y-m-d')])
