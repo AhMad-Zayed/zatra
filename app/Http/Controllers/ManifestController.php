@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\TripInstance;
 use App\Models\Passenger;
+use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
 
 class ManifestController extends Controller
@@ -46,6 +47,19 @@ class ManifestController extends Controller
             'groupedPassengers' => $groupedPassengers,
             'totalPassengers' => $passengers->count()
         ])
+        ->withBrowsershot(function (Browsershot $browsershot) {
+            // Production PDF Generator Crash fix (see zatara_audit_report.md, CRITICAL #5):
+            // Browsershot's default shell command resolves "node"/"npm" from the server
+            // process's inherited $PATH, which is not guaranteed to include them. Overriding
+            // via env-configured binaries — the same fix already applied in
+            // BookingSuccess::downloadPdf() — removes that dependency.
+            if (config('services.browsershot.node_path')) {
+                $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+            }
+            if (config('services.browsershot.npm_path')) {
+                $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+            }
+        })
         ->format('A4')
         ->name('manifest-' . $tripInstance->id . '.pdf');
     }

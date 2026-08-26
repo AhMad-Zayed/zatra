@@ -4,6 +4,7 @@ namespace App\Services\Notifications;
 
 use App\Models\Booking;
 use App\Jobs\SendBookingNotificationJob;
+use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Illuminate\Support\Facades\Storage;
 
@@ -57,6 +58,20 @@ class BookingNotificationService
                 'tenant' => $booking->tenant,
                 'customer' => $booking->customer,
             ])
+            ->withBrowsershot(function (Browsershot $browsershot) {
+                // Production PDF Generator Crash fix (see zatara_audit_report.md, CRITICAL #5) —
+                // same env-configured node/npm binary override as
+                // BookingSuccess::downloadPdf(), instead of relying on the server process's
+                // inherited $PATH to contain "node". Without this, the try/catch below silently
+                // swallows the failure and the customer's confirmation email/WhatsApp goes out
+                // with no ticket attached.
+                if (config('services.browsershot.node_path')) {
+                    $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+                }
+                if (config('services.browsershot.npm_path')) {
+                    $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+                }
+            })
             ->format('a4')
             ->save($fullPath);
 

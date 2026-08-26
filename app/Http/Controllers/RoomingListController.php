@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\RoomAssignment;
 use App\Models\TripStayLegHotelOption;
+use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
 
 /**
@@ -48,6 +49,17 @@ class RoomingListController extends Controller
             'rooms' => $rooms,
             'totalOccupants' => $totalOccupants,
         ])
+            ->withBrowsershot(function (Browsershot $browsershot) {
+                // Production PDF Generator Crash fix (see zatara_audit_report.md, CRITICAL #5) —
+                // same env-configured node/npm binary override as BookingSuccess::downloadPdf(),
+                // instead of relying on the server process's inherited $PATH to contain "node".
+                if (config('services.browsershot.node_path')) {
+                    $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+                }
+                if (config('services.browsershot.npm_path')) {
+                    $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+                }
+            })
             ->format('A4')
             ->name('rooming-list-' . $hotelOption->id . '.pdf');
     }

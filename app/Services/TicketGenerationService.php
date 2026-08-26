@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
@@ -38,6 +39,17 @@ class TicketGenerationService
 
         // 4. Generate the PDF
         Pdf::view('pdf.ticket-template', $data)
+            ->withBrowsershot(function (Browsershot $browsershot) {
+                // Production PDF Generator Crash fix (see zatara_audit_report.md, CRITICAL #5) —
+                // same env-configured node/npm binary override as BookingSuccess::downloadPdf(),
+                // instead of relying on the server process's inherited $PATH to contain "node".
+                if (config('services.browsershot.node_path')) {
+                    $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+                }
+                if (config('services.browsershot.npm_path')) {
+                    $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+                }
+            })
             ->format('A4')
             ->margins(10, 10, 10, 10)
             ->save($absolutePath);

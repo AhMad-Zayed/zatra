@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Tenant;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Spatie\Browsershot\Browsershot;
 use Spatie\LaravelPdf\Facades\Pdf; // Or Barryvdh\DomPDF\Facade\Pdf depending on installation
 
 class TicketDownloadController extends Controller
@@ -38,6 +39,17 @@ class TicketDownloadController extends Controller
             'tenant' => $tenant,
             'customer' => $customer,
         ])
+        ->withBrowsershot(function (Browsershot $browsershot) {
+            // Production PDF Generator Crash fix (see zatara_audit_report.md, CRITICAL #5) — same
+            // env-configured node/npm binary override as BookingSuccess::downloadPdf(), instead
+            // of relying on the server process's inherited $PATH to contain "node".
+            if (config('services.browsershot.node_path')) {
+                $browsershot->setNodeBinary(config('services.browsershot.node_path'));
+            }
+            if (config('services.browsershot.npm_path')) {
+                $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
+            }
+        })
         ->format('a4')
         ->name("Zatara-Ticket-{$booking->id}.pdf");
 
