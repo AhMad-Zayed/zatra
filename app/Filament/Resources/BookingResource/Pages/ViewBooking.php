@@ -378,6 +378,11 @@ class ViewBooking extends ViewRecord
                         ->label('الرحلة الجديدة')
                         ->options(function (Booking $record) {
                             return \App\Models\TripInstance::with('tripTemplate')
+                                // CRITICAL FIX: same unscoped TripInstance leak as
+                                // BookingResource.php's identical transfer_booking action --
+                                // scoped to the booking's own tenant, not the ambient Filament
+                                // tenant, so this stays correct even outside a Filament context.
+                                ->where('tenant_id', $record->tenant_id)
                                 ->where('id', '!=', $record->trip_instance_id)
                                 ->where('start_date', '>=', now())
                                 ->get()

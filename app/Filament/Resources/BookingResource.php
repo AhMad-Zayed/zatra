@@ -103,6 +103,10 @@ class BookingResource extends Resource
                                     ->label('موعد الرحلة')
                                     ->options(function () {
                                         return TripInstance::with('tripTemplate')
+                                            // CRITICAL FIX: TripInstance has no BelongsToTenant
+                                            // global scope -- explicit tenant filter, same fix
+                                            // as WaitingListResource's picker.
+                                            ->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id)
                                             ->where('start_date', '>=', now()->subDays(1)) // Show current and future
                                             ->orderBy('start_date', 'asc')
                                             ->get()
@@ -653,7 +657,11 @@ class BookingResource extends Resource
                     ->options(\App\Enums\BookingStatus::class),
                 Tables\Filters\SelectFilter::make('trip_instance_id')
                     ->label('الرحلة')
-                    ->options(fn () => \App\Models\TripInstance::with('tripTemplate')->get()->mapWithKeys(fn ($i) => [$i->id => $i->tripTemplate->title . ' (' . $i->start_date->format('Y-m-d') . ')'])->toArray())
+                    ->options(fn () => \App\Models\TripInstance::with('tripTemplate')
+                        // CRITICAL FIX: same unscoped-TripInstance leak as WaitingListResource's
+                        // picker -- explicit tenant filter.
+                        ->where('tenant_id', \Filament\Facades\Filament::getTenant()?->id)
+                        ->get()->mapWithKeys(fn ($i) => [$i->id => $i->tripTemplate->title . ' (' . $i->start_date->format('Y-m-d') . ')'])->toArray())
                     ->searchable(),
                 Tables\Filters\TernaryFilter::make('requirements_status')
                     ->label('متطلبات الرحلة')
@@ -1094,6 +1102,15 @@ class BookingResource extends Resource
                             ->label('الرحلة الجديدة')
                             ->options(function (Booking $record) {
                                 return \App\Models\TripInstance::with('tripTemplate')
+                                    // CRITICAL FIX: unscoped TripInstance leak -- this picker
+                                    // could previously let staff transfer a real paid booking to
+                                    // a trip belonging to ANOTHER tenant (BookingService::
+                                    // transferBooking() itself has no tenant check of its own on
+                                    // the destination trip, so this UI-level filter is the only
+                                    // defense). Scoped to the booking's own tenant, not the
+                                    // ambient Filament tenant, so this stays correct even if this
+                                    // action is ever reached from a cross-tenant context.
+                                    ->where('tenant_id', $record->tenant_id)
                                     ->where('id', '!=', $record->trip_instance_id)
                                     ->where('start_date', '>=', now())
                                     ->get()
