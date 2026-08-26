@@ -80,7 +80,7 @@ class PaymentResource extends Resource
                     ->label('طريقة الدفع')
                     ->options([
                         'cash' => 'نقدي',
-                        'transfer' => 'تحويل بنكي',
+                        'bank_transfer' => 'تحويل بنكي',
                         // 'visa' => 'بطاقة ائتمان / فيزا', // Disabled electronic payment
                     ])
                     ->required(),
@@ -130,7 +130,7 @@ class PaymentResource extends Resource
                     ->label('طريقة الدفع')
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'cash' => 'نقدي',
-                        'transfer' => 'تحويل بنكي',
+                        'bank_transfer' => 'تحويل بنكي',
                         'visa' => 'فيزا / بطاقة ائتمان',
                         default => $state,
                     })
@@ -168,7 +168,7 @@ class PaymentResource extends Resource
                     ->label('طريقة الدفع')
                     ->options([
                         'cash' => 'نقدي',
-                        'transfer' => 'تحويل بنكي',
+                        'bank_transfer' => 'تحويل بنكي',
                         'visa' => 'بطاقة ائتمان / فيزا',
                     ]),
                 Tables\Filters\Filter::make('created_at')

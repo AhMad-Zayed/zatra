@@ -23,8 +23,8 @@ class PhoneBookingPage extends Page
     protected static ?string $navigationIcon  = 'heroicon-o-phone';
     protected static ?string $navigationGroup = 'الحجوزات';
     protected static ?int    $navigationSort   = 0; // First item in group
-    protected static ?string $navigationLabel = '📞 حجز هاتفي';
-    protected static ?string $title           = '📞 حجز هاتفي سريع';
+    protected static ?string $navigationLabel = 'حجز هاتفي';
+    protected static ?string $title           = 'حجز هاتفي سريع';
     protected static string  $view            = 'filament.pages.phone-booking';
 
     // ─── Step control ─────────────────────────────────────────────────

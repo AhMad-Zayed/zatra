@@ -55,15 +55,15 @@
     {{-- Context bar --}}
     <div class="flex flex-wrap gap-3 items-center p-4 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-2">
-            <span class="text-lg">👤</span>
+            <x-heroicon-o-user class="h-5 w-5 text-gray-400 flex-shrink-0" />
             <span class="font-semibold text-gray-800 dark:text-white">{{ $customerName }}</span>
             <span class="text-gray-400 text-sm">{{ $customerPhone }}</span>
         </div>
         <div class="w-px h-5 bg-gray-300 dark:bg-gray-600 hidden md:block"></div>
         <div class="flex items-center gap-2">
-            <span class="text-lg">🗺️</span>
+            <x-heroicon-o-map class="h-5 w-5 text-gray-400 flex-shrink-0" />
             <span class="font-semibold text-gray-800 dark:text-white">{{ $selectedTrip['title'] ?? '' }}</span>
-            <span class="text-gray-400 text-sm">{{ $selectedTrip['start'] ?? '' }} ← {{ $selectedTrip['end'] ?? '' }}</span>
+            <span class="text-gray-400 text-sm" dir="ltr">{{ $selectedTrip['start'] ?? '' }} → {{ $selectedTrip['end'] ?? '' }}</span>
         </div>
         <div class="ml-auto">
             <span class="px-2 py-1 rounded-lg text-xs font-bold
@@ -384,8 +384,8 @@
                 <div class="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
                     <div class="flex-1 min-w-0">
                         <div class="font-bold text-amber-800 dark:text-amber-200">{{ $selectedTrip['title'] }}</div>
-                        <div class="text-amber-600 dark:text-amber-400 text-sm mt-0.5">
-                            📅 {{ $selectedTrip['start'] }} → {{ $selectedTrip['end'] }}
+                        <div class="text-amber-600 dark:text-amber-400 text-sm mt-0.5" dir="ltr">
+                            {{ $selectedTrip['start'] }} → {{ $selectedTrip['end'] }}
                         </div>
                         <div class="mt-2 flex items-center gap-2">
                             <span class="text-xs px-2 py-0.5 rounded-full font-bold
@@ -440,7 +440,7 @@
                         @if(!$isFull) wire:click="selectTrip({{ $t['id'] }})" @endif>
                         <div class="flex-1 min-w-0">
                             <div class="font-semibold text-gray-900 dark:text-white text-sm">{{ $t['title'] }}</div>
-                            <div class="text-xs text-gray-400 mt-0.5">{{ $t['start_date'] }} → {{ $t['end_date'] }}</div>
+                            <div class="text-xs text-gray-400 mt-0.5" dir="ltr">{{ $t['start_date'] }} → {{ $t['end_date'] }}</div>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <span class="text-xs px-2 py-0.5 rounded-full font-bold
