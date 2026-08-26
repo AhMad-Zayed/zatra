@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\CreateBookingService;
 use App\Services\RequirementValidationService;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
@@ -376,6 +377,62 @@ class TripTypeAndRequirementEnforcementTest extends TestCase
 
         $this->assertNotNull($booking);
         $this->assertFalse($booking->passengers()->first()->requirements_complete);
+    }
+
+    // Restores the notification-firing assertions the retired QuickBookingPage tests used to
+    // carry (test_quick_booking_page_never_blocks_but_flags_and_notifies_on_missing_requirements
+    // / test_quick_booking_page_does_not_notify_when_requirements_satisfied) — that behavior
+    // lives in handleRecordCreation(), used by the wizard too, and wasn't actually covered by
+    // the reflection-based test above (it never asserted on the notification). Notification::
+    // send() just session()->push()es (see vendor/filament/notifications/src/Notification.php),
+    // so Notification::assertNotified()/assertNotNotified() work directly off a bare
+    // `new CreateBooking()` reflection call — no Livewire::test() component needed.
+    public function test_admin_create_booking_notifies_when_requirements_missing(): void
+    {
+        $f = $this->makeFixture('c11', ['text']);
+        $admin = $this->makeAgencyAdmin($f['tenant'], '0791199011');
+        $this->actingAs($admin);
+        Filament::setTenant($f['tenant'], true);
+
+        $page = new CreateBooking();
+        $method = new \ReflectionMethod($page, 'handleRecordCreation');
+        $method->setAccessible(true);
+
+        $method->invoke($page, [
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'customer_id' => $f['customer']->id,
+            'user_id' => $admin->id,
+            'passengers' => [
+                ['trip_passenger_category_id' => $f['cat']->id, 'first_name' => 'No', 'last_name' => 'Doc'],
+            ],
+        ]);
+
+        Notification::assertNotified('تنبيه: بيانات ناقصة');
+    }
+
+    public function test_admin_create_booking_does_not_notify_when_requirements_satisfied(): void
+    {
+        $f = $this->makeFixture('c12', ['text']);
+        $admin = $this->makeAgencyAdmin($f['tenant'], '0791199012');
+        $this->actingAs($admin);
+        Filament::setTenant($f['tenant'], true);
+
+        $page = new CreateBooking();
+        $method = new \ReflectionMethod($page, 'handleRecordCreation');
+        $method->setAccessible(true);
+
+        $method->invoke($page, [
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'customer_id' => $f['customer']->id,
+            'user_id' => $admin->id,
+            'passengers' => [
+                ['trip_passenger_category_id' => $f['cat']->id, 'first_name' => 'Has', 'last_name' => 'Doc', 'document_number' => '12345'],
+            ],
+        ]);
+
+        Notification::assertNotNotified('تنبيه: بيانات ناقصة');
     }
 
     public function test_booking_resource_list_page_renders_with_requirements_status_column_and_filter(): void
