@@ -1,16 +1,36 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Middleware\ResolveStorefrontTenant;
 use App\Http\Controllers\StorefrontController;
-use App\Http\Controllers\PortalController;
+use App\Models\Tenant;
 
+// --- LEGACY PORTAL REDIRECTS ---
+// PortalController and CustomerAuthService have been retired: Storefront\MyBookings and
+// CustomerBookingPortal are now the sole customer-facing "my bookings" surfaces (the old
+// send-otp/verify-otp/showLogin methods were already fully dead -- no routes pointed at them
+// before this change; only dashboard/logout were still live). These two routes are kept as
+// permanent redirects rather than a hard 404, as a safety net for any un-discoverable old link
+// (a bookmark, a stale WhatsApp message). ResolveStorefrontTenant still resolves the old
+// plain-string tenant_slug exactly as it always did; the redirect target then uses the tenant's
+// real .slug column, which the new {tenant:slug}-bound routes require.
 Route::middleware([ResolveStorefrontTenant::class])->group(function () {
-    // Portal auth routes (Dashboard/Logout)
-    Route::middleware(['auth:customer'])->group(function () {
-        Route::get('/t/{tenant_slug}/portal/dashboard', [PortalController::class, 'dashboard'])->name('portal.dashboard');
-        Route::post('/t/{tenant_slug}/portal/logout', [PortalController::class, 'logout'])->name('portal.logout');
-    });
+    Route::get('/t/{tenant_slug}/portal/dashboard', function () {
+        $tenant = app(Tenant::class);
+
+        return redirect()->route('storefront.my-bookings', ['tenant' => $tenant->slug], 301);
+    })->name('portal.dashboard');
+
+    Route::post('/t/{tenant_slug}/portal/logout', function () {
+        $tenant = app(Tenant::class);
+
+        Auth::guard('customer')->logout();
+        request()->session()->invalidate();
+        request()->session()->regenerateToken();
+
+        return redirect()->route('portal.login', ['tenant' => $tenant->slug], 301);
+    })->name('portal.logout');
 });
 
 Route::get('/', function () {
