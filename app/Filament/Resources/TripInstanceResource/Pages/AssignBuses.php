@@ -3,9 +3,12 @@
 namespace App\Filament\Resources\TripInstanceResource\Pages;
 
 use App\Enums\BusOwnershipTypeEnum;
+use App\Exceptions\BusCapacityExceededException;
 use App\Filament\Resources\TripInstanceResource;
+use App\Models\Passenger;
 use App\Models\TripBusAssignment;
 use App\Models\Vehicle;
+use App\Services\BusSeatAssignmentService;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -17,9 +20,9 @@ use Filament\Resources\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * Bus/Fleet redesign Ticket 1 — CRUD skeleton only: add/edit/remove TripBusAssignment rows for
- * a trip instance. Deliberately NOT the drag-and-drop seat assignment UI (that's Ticket 3,
- * built on top of this same page later, mirroring how AssignRooms grew from a data skeleton).
+ * Bus/Fleet redesign Ticket 1 (CRUD skeleton: add/edit/remove TripBusAssignment rows) + Ticket 3
+ * (drag-and-drop seat assignment, built directly on top of the same page — mirroring how
+ * AssignRooms grew from a data skeleton into the full room-assignment board).
  */
 class AssignBuses extends Page
 {
@@ -49,6 +52,72 @@ class AssignBuses extends Page
     public function totalCapacity(): int
     {
         return $this->buses()->sum('capacity');
+    }
+
+    /**
+     * Bus/Fleet redesign Ticket 3 — the drag-and-drop board data: unassigned passenger pool +
+     * each bus with its current occupants.
+     *
+     * @return array{unassigned: Collection<int, Passenger>, buses: Collection<int, TripBusAssignment>}
+     */
+    public function boardData(): array
+    {
+        return app(BusSeatAssignmentService::class)->getBoardData($this->record);
+    }
+
+    public function dropPassenger(int $passengerId, int $busId): void
+    {
+        $passenger = Passenger::findOrFail($passengerId);
+        $bus = $this->findBus($busId);
+
+        // Tenant-isolation guard: refuse to place a passenger from a different tenant's booking,
+        // matching AssignRooms' identical guard, even though the route/panel tenant middleware
+        // already prevents reaching this page for another tenant's trip.
+        if ($passenger->tenant_id !== $this->record->tenant_id) {
+            abort(403);
+        }
+
+        try {
+            app(BusSeatAssignmentService::class)->assignPassengerToBus($passenger, $bus, auth()->user());
+        } catch (BusCapacityExceededException $e) {
+            Notification::make()
+                ->danger()
+                ->title('تعذر التخصيص')
+                ->body($e->getMessage())
+                ->send();
+        }
+    }
+
+    public function removeFromBus(int $passengerId): void
+    {
+        $passenger = Passenger::findOrFail($passengerId);
+
+        if ($passenger->tenant_id !== $this->record->tenant_id) {
+            abort(403);
+        }
+
+        app(BusSeatAssignmentService::class)->unassignPassenger($passenger);
+    }
+
+    public function runAutoAssign(): void
+    {
+        $result = app(BusSeatAssignmentService::class)->autoAssign($this->record, auth()->user());
+
+        if ($result['unassigned']->isEmpty()) {
+            Notification::make()
+                ->success()
+                ->title("تم تخصيص {$result['assigned']} راكب تلقائياً")
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->warning()
+            ->title("تم تخصيص {$result['assigned']} راكب — تعذر تخصيص " . $result['unassigned']->count())
+            ->body('بانتظار التخصيص اليدوي: ' . $result['unassigned']->pluck('display_name')->implode('، '))
+            ->persistent()
+            ->send();
     }
 
     protected function getHeaderActions(): array

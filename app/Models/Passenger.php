@@ -32,6 +32,7 @@ class Passenger extends Model implements HasMedia
         'requirements_complete',
         'passenger_label',
         'seat_number',
+        'trip_bus_assignment_id',
         'is_checked_in',
     ];
 
@@ -90,5 +91,11 @@ class Passenger extends Model implements HasMedia
     public function roomAssignment(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(RoomAssignment::class);
+    }
+
+    // Bus/Fleet redesign Ticket 3 — purely additive, alongside the existing seat_number column.
+    public function tripBusAssignment(): BelongsTo
+    {
+        return $this->belongsTo(TripBusAssignment::class);
     }
 }

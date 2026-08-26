@@ -182,4 +182,10 @@ class TripBusAssignment extends Model
     {
         return $this->belongsTo(User::class, 'guide_staff_id');
     }
+
+    // Bus/Fleet redesign Ticket 3 — passengers seated on this specific bus.
+    public function passengers(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Passenger::class);
+    }
 }
