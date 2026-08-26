@@ -59,10 +59,19 @@
                         @endif
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
                         <div class="absolute bottom-6 right-6 text-white">
-                            <h2 class="text-2xl font-bold mb-1">{{ $booking->tripInstance ? optional($booking->tripInstance->tripTemplate)->title : $booking->snapshot_trip_title }}</h2>
+                            {{-- Price Integrity Audit, Finding B/C: snapshot_trip_title/snapshot_start_date/
+                                 snapshot_end_date are captured correctly at booking time but were being
+                                 bypassed in favor of the live tripInstance->tripTemplate relationship
+                                 whenever the trip instance still existed (virtually always) -- so renaming
+                                 a trip template after booking silently rewrote what every past customer's
+                                 booking appeared to show here. Snapshot is now primary; live data is only
+                                 a fallback for the rare case where the trip instance was hard-deleted and
+                                 no snapshot exists either (e.g. a booking created before snapshotting was
+                                 introduced). --}}
+                            <h2 class="text-2xl font-bold mb-1">{{ $booking->snapshot_trip_title ?? optional($booking->tripInstance?->tripTemplate)->title }}</h2>
                             <p class="text-white/80 flex items-center font-medium">
                                 <svg class="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                                {{ $booking->tripInstance ? $booking->tripInstance->start_date?->format('d M Y') : \Carbon\Carbon::parse($booking->snapshot_start_date)->format('d M Y') }} - {{ $booking->tripInstance ? $booking->tripInstance->end_date?->format('d M Y') : \Carbon\Carbon::parse($booking->snapshot_end_date)->format('d M Y') }}
+                                {{ $booking->snapshot_start_date ? \Carbon\Carbon::parse($booking->snapshot_start_date)->format('d M Y') : $booking->tripInstance?->start_date?->format('d M Y') }} - {{ $booking->snapshot_end_date ? \Carbon\Carbon::parse($booking->snapshot_end_date)->format('d M Y') : $booking->tripInstance?->end_date?->format('d M Y') }}
                             </p>
                         </div>
                     </div>

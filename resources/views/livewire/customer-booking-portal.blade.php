@@ -10,7 +10,7 @@
                 أهلاً بك في <span class="text-blue-600">{{ $booking->tenant->name }}</span>
             </h1>
             <p class="text-lg text-slate-600 max-w-2xl mx-auto">
-                رحلتك القادمة إلى <strong>{{ $booking->tripInstance->tripTemplate->title }}</strong> أصبحت قريبة! يرجى استكمال بيانات الركاب واختيار مقاعدكم لضمان رحلة مريحة وممتعة.
+                رحلتك القادمة إلى <strong>{{ $booking->snapshot_trip_title ?? $booking->tripInstance?->tripTemplate?->title }}</strong> أصبحت قريبة! يرجى استكمال بيانات الركاب واختيار مقاعدكم لضمان رحلة مريحة وممتعة.
             </p>
         </div>
 
@@ -58,13 +58,16 @@
                     </div>
                     <h2 class="text-3xl font-bold text-slate-800">تفاصيل حجزك</h2>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-right bg-slate-50 p-6 rounded-2xl border border-slate-100 shadow-inner">
+                        {{-- Price Integrity Audit, Finding B/C: prefer the booking's own snapshot,
+                             matching my-bookings.blade.php's fix -- live data only as a fallback for
+                             the rare case where no snapshot exists (a booking predating snapshotting). --}}
                         <div>
                             <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">الوجهة</p>
-                            <p class="font-bold text-slate-800">{{ $booking->tripInstance->tripTemplate->title }}</p>
+                            <p class="font-bold text-slate-800">{{ $booking->snapshot_trip_title ?? $booking->tripInstance?->tripTemplate?->title }}</p>
                         </div>
                         <div>
                             <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">تاريخ الانطلاق</p>
-                            <p class="font-bold text-slate-800">{{ $booking->tripInstance->start_date->format('Y/m/d') }}</p>
+                            <p class="font-bold text-slate-800">{{ $booking->snapshot_start_date ? \Carbon\Carbon::parse($booking->snapshot_start_date)->format('Y/m/d') : $booking->tripInstance?->start_date?->format('Y/m/d') }}</p>
                         </div>
                         <div>
                             <p class="text-xs text-slate-500 uppercase tracking-wider mb-1">رقم الحجز</p>

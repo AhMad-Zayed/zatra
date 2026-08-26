@@ -593,8 +593,15 @@ class BookingResource extends Resource
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('tripInstance.tripTemplate.title')
+                // Price Integrity Audit, Finding B/C: prefer the booking's own snapshot_trip_title
+                // (captured at booking time) over the live tripInstance->tripTemplate relationship --
+                // renaming a trip template used to silently rewrite what this column showed for every
+                // past booking. Column key is the real snapshot_trip_title DB column (natively
+                // sortable), getStateUsing() only supplies the fallback render for the rare case
+                // where no snapshot exists (a booking predating snapshotting).
+                Tables\Columns\TextColumn::make('snapshot_trip_title')
                     ->label('الرحلة')
+                    ->getStateUsing(fn ($record) => $record->snapshot_trip_title ?? optional($record->tripInstance?->tripTemplate)->title)
                     ->sortable(),
                 Tables\Columns\TextColumn::make('booking_status')
                     ->label('حالة الحجز')
@@ -690,11 +697,15 @@ class BookingResource extends Resource
                     }),
             ])
             ->groups([
-                \Filament\Tables\Grouping\Group::make('tripInstance.tripTemplate.title')
+                // Price Integrity Audit, Finding B/C: groups by the snapshot title too -- a
+                // booking should stay grouped under the route it was actually booked as, not
+                // silently regroup under a renamed live title.
+                \Filament\Tables\Grouping\Group::make('snapshot_trip_title')
                     ->label('الرحلة')
+                    ->getTitleFromRecordUsing(fn ($record) => $record->snapshot_trip_title ?? optional($record->tripInstance?->tripTemplate)->title)
                     ->collapsible(),
             ])
-            ->defaultGroup('tripInstance.tripTemplate.title')
+            ->defaultGroup('snapshot_trip_title')
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
