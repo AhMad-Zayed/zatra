@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BookingResource\Pages;
 
 use App\Filament\Resources\BookingResource;
+use App\Models\Booking;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Forms\Components\TextInput;

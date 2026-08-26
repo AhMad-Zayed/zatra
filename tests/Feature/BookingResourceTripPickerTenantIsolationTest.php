@@ -32,15 +32,12 @@ use Tests\TestCase;
  * picker was the only defense).
  *
  * A 4th, identical copy of the transfer_booking picker exists in
- * BookingResource/Pages/ViewBooking.php (the booking detail page's header action). It is fixed
- * identically but NOT covered by a behavioral test here: mounting that specific action crashes
- * with an unrelated, pre-existing bug (ViewBooking.php never imports App\Models\Booking, so
- * every `Booking $record` type-hint in that file's transfer_booking closures resolves to the
- * wrong, nonexistent class and throws a TypeError as soon as the action is mounted -- confirmed
- * reproducible, not something introduced by this fix). That bug makes the ENTIRE transfer_booking
- * feature on the booking detail page unusable today, independent of tenant scoping, and is
- * flagged separately as its own finding, not fixed here. A source-text assertion below confirms
- * the tenant-scope fix landed in that file too.
+ * BookingResource/Pages/ViewBooking.php (the booking detail page's header action) and is fixed
+ * identically. It also carries its own separate, since-fixed bug (a missing `use
+ * App\Models\Booking;` import broke the entire action on that page, independent of tenant
+ * scoping -- see the dedicated EMERGENCY HOTFIX commit and
+ * ViewBookingTransferActionImportTest), which is why the tenant-scope test for this specific
+ * picker was originally a source-text assertion rather than a behavioral one.
  */
 class BookingResourceTripPickerTenantIsolationTest extends TestCase
 {
