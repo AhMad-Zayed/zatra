@@ -118,23 +118,36 @@ Route::get('/login/magic', function (\Illuminate\Http\Request $request) {
 })->name('login.magic');
 
 // --- MAGIC LINK / CUSTOMER PORTAL ---
+// EMERGENCY FIX: both routes previously carried auth:customer middleware, which broke the real
+// WhatsApp-delivered magic link for every phone booking -- CreateBooking.php sends a plain,
+// unsigned route('customer.booking.portal', $booking->uuid) URL (not a signed login link), so a
+// genuinely fresh customer hit Laravel's default unauthenticated redirect trying to build a URL
+// for a route literally named "login" (which doesn't exist in this app), throwing a hard 500 on
+// every click. Confirmed live via a zero-cookie browser session before this fix.
+//
+// Removing the middleware restores CustomerBookingPortal's own already-written no-login design
+// (mount() already tolerates an absent customer session, only using it to optionally scope a
+// query) -- the UUID itself is the access credential here, the same trust model as any other
+// unguessable share link, and neither route performs any additional identity check beyond the
+// UUID match even when the middleware was present. The ticket-download route is fixed
+// identically since it's linked directly from this same page's own view (the post-completion
+// "download ticket" button) -- leaving it broken would mean the page still couldn't actually be
+// used end-to-end.
 Route::get('/b/{uuid}', \App\Livewire\CustomerBookingPortal::class)
-    ->name('customer.booking.portal')
-    ->middleware(['auth:customer']);
+    ->name('customer.booking.portal');
 
 Route::get('/b/{uuid}/ticket/download', function ($uuid) {
     $booking = \App\Models\Booking::where('uuid', $uuid)->firstOrFail();
-    
+
     // Get latest ticket media
     $media = $booking->getMedia('tickets')->last();
-    
+
     if (!$media) {
         abort(404, 'التذكرة غير متوفرة بعد.');
     }
-    
+
     return response()->download($media->getPath(), "Ticket_{$booking->pnr}.pdf");
-})->name('customer.ticket.download')
-->middleware(['auth:customer']);
+})->name('customer.ticket.download');
 
 // --- TOUR GUIDE MANIFEST ---
 Route::get('/g/{uuid}', \App\Livewire\TourGuideManifest::class)->name('tour.guide.manifest');
