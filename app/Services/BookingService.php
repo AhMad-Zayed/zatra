@@ -10,6 +10,8 @@ use App\Models\Payment;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentType;
 use App\Enums\PaymentStatus;
+use App\Enums\TripStatusEnum;
+use App\Exceptions\InvalidTransferDestinationException;
 use Illuminate\Support\Facades\DB;
 
 class BookingService
@@ -258,6 +260,17 @@ class BookingService
             }
 
             $newTrip = TripInstance::where('id', $newTrip->id)->lockForUpdate()->firstOrFail();
+
+            // Hotel/Rooming series, final item: the destination trip's lifecycle status was
+            // never checked here -- a booking could be transferred into an already-Cancelled,
+            // Completed, or InProgress trip. Checked inside the same lock/transaction already
+            // established above (no separate query, no race window between this check and
+            // inventory consumption below), and before any mutation or inventory consumption in
+            // this method. Draft, Active, and Closed remain valid destinations -- the same
+            // "normal lifecycle" set already established in TripService::cancelTrip().
+            if (in_array($newTrip->status, [TripStatusEnum::Cancelled, TripStatusEnum::Completed, TripStatusEnum::InProgress], true)) {
+                throw new InvalidTransferDestinationException('لا يمكن تحويل الحجز إلى رحلة ملغاة أو مكتملة أو قيد التنفيذ.');
+            }
 
             $passengers = $booking->passengers()->get();
             $count = $passengers->count();

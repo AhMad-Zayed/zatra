@@ -33,7 +33,7 @@ class TransferBookingTest extends TestCase
      *   oldCat: TripPassengerCategory, newInstance: TripInstance, newCat: TripPassengerCategory,
      *   booking: Booking, p1: int, p2: int}
      */
-    private function makeTransferFixture(string $suffix, int $oldSeats = 10, int $newSeats = 10): array
+    private function makeTransferFixture(string $suffix, int $oldSeats = 10, int $newSeats = 10, string $newStatus = 'active'): array
     {
         $tenant = Tenant::create(['name' => "Agency {$suffix}", 'slug' => "agency-tr-{$suffix}", 'domain' => "{$suffix}.zatara.com"]);
         $customer = Customer::create(['name' => 'Jane', 'phone' => "0590{$suffix}", 'tenant_id' => $tenant->id]);
@@ -59,7 +59,7 @@ class TransferBookingTest extends TestCase
             'start_date' => now()->addDays(20),
             'end_date' => now()->addDays(25),
             'available_seats' => $newSeats,
-            'status' => 'active',
+            'status' => $newStatus,
         ]);
         $newCat = TripPassengerCategory::create([
             'tenant_id' => $tenant->id, 'trip_instance_id' => $newInstance->id,
@@ -152,6 +152,110 @@ class TransferBookingTest extends TestCase
             $fresh = $f['booking']->fresh();
             $this->assertEquals($f['oldInstance']->id, $fresh->trip_instance_id, 'Booking must remain on the original trip when the transfer is blocked.');
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Hotel/Rooming series, final item: destination trip lifecycle status
+    // ------------------------------------------------------------------
+
+    private function assertTransferRejectedForDestinationStatus(string $suffix, string $status): void
+    {
+        $f = $this->makeTransferFixture($suffix, newStatus: $status);
+        $ledgerCountBefore = InventoryLedger::count();
+
+        $this->expectException(\App\Exceptions\InvalidTransferDestinationException::class);
+
+        try {
+            app(BookingService::class)->transferBooking(
+                $f['booking'],
+                $f['newInstance'],
+                [$f['p1'] => $f['newCat']->id, $f['p2'] => $f['newCat']->id]
+            );
+        } finally {
+            // Zero mutation, zero partial ledger writes -- rejected before any inventory
+            // consumption or booking mutation, inside the same lock/transaction.
+            $this->assertSame($ledgerCountBefore, InventoryLedger::count());
+            $fresh = $f['booking']->fresh();
+            $this->assertEquals($f['oldInstance']->id, $fresh->trip_instance_id, 'Booking must remain on the original trip when the destination status is invalid.');
+            $this->assertEquals($f['oldCat']->id, \App\Models\Passenger::find($f['p1'])->trip_passenger_category_id, 'Passenger category must be unchanged.');
+        }
+    }
+
+    public function test_transfer_booking_rejected_for_cancelled_destination(): void
+    {
+        $this->assertTransferRejectedForDestinationStatus('status-cancelled', 'cancelled');
+    }
+
+    public function test_transfer_booking_rejected_for_completed_destination(): void
+    {
+        $this->assertTransferRejectedForDestinationStatus('status-completed', 'completed');
+    }
+
+    public function test_transfer_booking_rejected_for_inprogress_destination(): void
+    {
+        $this->assertTransferRejectedForDestinationStatus('status-inprogress', 'in_progress');
+    }
+
+    private function assertTransferSucceedsForDestinationStatus(string $suffix, string $status): void
+    {
+        // Re-confirms existing behavior is unchanged for the "normal lifecycle" statuses
+        // already established in TripService::cancelTrip() -- same set, same meaning here.
+        $f = $this->makeTransferFixture($suffix, newStatus: $status);
+
+        app(BookingService::class)->transferBooking(
+            $f['booking'],
+            $f['newInstance'],
+            [$f['p1'] => $f['newCat']->id, $f['p2'] => $f['newCat']->id]
+        );
+
+        $fresh = $f['booking']->fresh();
+        $this->assertEquals($f['newInstance']->id, $fresh->trip_instance_id, "Transfer to a '{$status}' destination must still succeed.");
+        $this->assertDatabaseHas('inventory_ledgers', [
+            'trip_instance_id' => $f['newInstance']->id,
+            'booking_id' => $f['booking']->id,
+            'type' => 'confirmed',
+            'quantity' => -2,
+        ]);
+    }
+
+    public function test_transfer_booking_still_succeeds_for_draft_destination(): void
+    {
+        $this->assertTransferSucceedsForDestinationStatus('valid-status-draft', 'draft');
+    }
+
+    public function test_transfer_booking_still_succeeds_for_active_destination(): void
+    {
+        $this->assertTransferSucceedsForDestinationStatus('valid-status-active', 'active');
+    }
+
+    public function test_transfer_booking_still_succeeds_for_closed_destination(): void
+    {
+        $this->assertTransferSucceedsForDestinationStatus('valid-status-closed', 'closed');
+    }
+
+    public function test_transfer_booking_status_check_fails_before_capacity_check(): void
+    {
+        // Destination is BOTH cancelled AND full (0 remaining seats for a 2-passenger
+        // transfer) -- must reject for the status reason, not the capacity reason, proving
+        // the status check runs first ("fail fast, cleaner rejection reason").
+        $f = $this->makeTransferFixture('status-before-capacity', oldSeats: 10, newSeats: 0, newStatus: 'cancelled');
+        $ledgerCountBefore = InventoryLedger::count();
+
+        try {
+            app(BookingService::class)->transferBooking(
+                $f['booking'],
+                $f['newInstance'],
+                [$f['p1'] => $f['newCat']->id, $f['p2'] => $f['newCat']->id]
+            );
+            $this->fail('Expected InvalidTransferDestinationException to be thrown.');
+        } catch (InsufficientSeatsException $e) {
+            $this->fail('Status check must fail BEFORE the capacity check -- got InsufficientSeatsException instead of InvalidTransferDestinationException.');
+        } catch (\App\Exceptions\InvalidTransferDestinationException $e) {
+            // Expected.
+        }
+
+        $this->assertSame($ledgerCountBefore, InventoryLedger::count());
+        $this->assertEquals($f['oldInstance']->id, $f['booking']->fresh()->trip_instance_id);
     }
 
     public function test_transfer_booking_capacity_check_reads_live_state_not_a_stale_snapshot(): void
