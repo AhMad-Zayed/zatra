@@ -5,45 +5,37 @@ gaps, not product features. Logged here (separate from `docs/FUTURE_FEATURES_BAC
 is for product-feature gaps) since these need someone with DB/infra context to pick up, and the
 value is entirely in not having to re-derive the reproduction steps.
 
-## SQLite/MySQL parity: case-insensitive `unique()` constraints on string columns
+## SQLite/MySQL parity: case-insensitive `unique()` constraints on string columns — RESOLVED
 
-**Found**: 2026-08-27/28, during the SQLite/MySQL Behavioral Parity Audit (triggered by two prior
-incidents this session: a missing `inventory_ledgers` enum CHECK constraint, and an ambiguous
-`ORDER BY` column crash in `WaitingListsRelationManager`, both invisible to the SQLite-run test
-suite despite being live-breaking or silently-wrong on MySQL).
+**Found**: 2026-08-27/28, during the SQLite/MySQL Behavioral Parity Audit. **Fixed**:
+2026-08-28ish, in the Case-Insensitive Uniqueness Fix ticket. Kept here (rather than moved to the
+resolved list below) since the original reproduction detail is still useful context for anyone
+touching these columns.
 
 MySQL's default collation is case-insensitive; SQLite's default TEXT comparison is
-case-sensitive. Any `unique()` constraint on a string column can therefore accept case-variant
-duplicates on SQLite that MySQL would reject as a duplicate key — meaning a real production bug
-(two "duplicate" rows differing only by case slipping past a uniqueness check) could exist in the
-app and never be caught by any test run against SQLite.
+case-sensitive. Original reproduction: `customers` has `unique(['tenant_id', 'email'])`;
+inserting `user@example.com` then `User@Example.com` under the same tenant succeeded as two
+distinct rows on SQLite, but the second insert was rejected on MySQL (real dev DB) as a duplicate
+key.
 
-**Confirmed concretely** (test run, then rolled back / reverted, not left in the codebase):
-`customers` has `unique(['tenant_id', 'email'])`. Inserting `user@example.com` then
-`User@Example.com` under the same tenant:
-- SQLite: **both inserts succeed** — two distinct rows exist.
-- MySQL (real dev DB, same two inserts, transaction rolled back after): second insert
-  **rejected** — `SQLSTATE[23000]: ... Duplicate entry '1-Parity-Check@Example.com' for key
-  'customers_tenant_id_email_unique'`.
+**Fix applied, differentiated by column type** (not one blanket solution):
+- **Identity/auth columns** (`customers.email`, `users.email`): normalized to lowercase at the
+  application layer via a `static::saving()` hook on `Customer`/`User` (plus `GuestSession`, and
+  an explicit fix in `SocialAuthController` for the one `firstOrCreate()`/`where()` call site
+  whose search input needed lowercasing too — hooks don't cover query search arrays, only the
+  eventual `create()`). A defensive backfill migration
+  (`2026_09_03_000001_backfill_lowercase_customer_and_user_emails.php`) normalized existing rows,
+  detecting and skipping (with full logging, never silently merging) any case-collision found.
+- **Display-name columns** (`global_addons.name`, `passenger_categories.name` — the live table
+  behind the `global_pricing_tiers.name` name used above, renamed in
+  `2026_06_28_000000_rename_pricing_tiers_to_passenger_categories.php` — and `tenants.slug`,
+  pulled into scope after all: turned out to be manually-typed with no auto-slugify, unlike
+  `trip_templates.slug` which stayed correctly excluded): stored casing is preserved for display;
+  a new reusable `App\Rules\CaseInsensitiveUnique` (engine-agnostic `LOWER()` comparison) makes
+  the *uniqueness check itself* case-insensitive instead.
 
-**Same category, structurally identical, not individually re-verified**:
-- `users.email` (`unique()`)
-- `global_addons` — `unique(['tenant_id', 'name'])`
-- `global_pricing_tiers` — `unique(['tenant_id', 'name'])`
-
-**Lower practical risk, same schema-level gap but unlikely to actually trigger**:
-`tenants.slug` / `trip_templates.slug` — `Str::slug()` normalizes to lowercase before storage in
-every write path checked, so a real case-collision is unlikely even though the underlying
-constraint gap exists identically.
-
-**Fix approaches worth considering** (not evaluated in depth — this is a triage note, not a
-design): (a) add `COLLATE NOCASE` to the relevant SQLite columns so the test DB matches MySQL's
-case-insensitive behavior, (b) normalize to lowercase at the application layer before every write
-to an affected column (more invasive, touches every write path), or (c) accept the gap and add a
-regression test per affected column using the same probe pattern shown above, run against a real
-MySQL test connection specifically for this class of constraint (the general test suite would
-need a documented way to opt a specific test into the mysql connection, which doesn't currently
-exist).
+See `tests/Feature/EmailNormalizationTest.php`, `tests/Feature/CaseInsensitiveUniqueRuleTest.php`,
+and `tests/Feature/EmailBackfillMigrationTest.php` for the full regression coverage.
 
 ## SQLite ignores VARCHAR length limits entirely
 
