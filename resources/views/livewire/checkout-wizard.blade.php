@@ -168,6 +168,20 @@
                     </div>
                 @endif
 
+                {{-- Running total: updates live as each passenger's category changes, without
+                     waiting for Step 4 -- reuses passengersSubtotal exactly as-is (Part 1), a pure
+                     display-layer addition with no effect on what actually gets submitted.
+                     Sticky so it stays visible while scrolling through several passenger cards. --}}
+                @if($this->tripInstance->tripPassengerCategories->count() > 0)
+                    <div class="sticky top-24 z-10 mb-6 glass-panel rounded-2xl px-5 py-4 flex items-center justify-between">
+                        <span class="text-sm font-bold text-slate-500">الإجمالي حتى الآن</span>
+                        <span class="text-2xl font-black text-zatara-blue">
+                            {{ number_format($this->passengersSubtotal) }}
+                            <span class="text-sm font-medium text-slate-400">{{ $this->currency }}</span>
+                        </span>
+                    </div>
+                @endif
+
                 <form wire:submit.prevent="submitPassengers" class="space-y-8">
                     @foreach($form->passengers as $index => $passenger)
                         <div wire:key="passenger-item-{{ $index }}" class="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative group transition-all hover:shadow-md">
@@ -180,7 +194,7 @@
                             </div>
                             
                             <div class="flex items-center justify-between mb-6">
-                                <h4 class="text-zatara-gold font-bold text-lg flex items-center gap-2">
+                                <h4 class="text-zatara-blue font-bold text-lg flex items-center gap-2">
                                     <span class="material-symbols-outlined">person</span>
                                     مسافر #{{ $index + 1 }}
                                 </h4>
@@ -235,7 +249,7 @@
                                 @if($this->tripInstance->tripPassengerCategories->count() > 0)
                                 <div>
                                     <label class="block text-xs font-bold text-zatara-blue mb-2">نوع المسافر (الباقة)</label>
-                                    <select wire:model="form.passengers.{{ $index }}.trip_passenger_category_id"
+                                    <select wire:model.live="form.passengers.{{ $index }}.trip_passenger_category_id"
                                             class="glass-input w-full px-4 py-3 text-slate-800 bg-white transition-colors {{ $errors->has("form.passengers.{$index}.trip_passenger_category_id") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                         <option value="">اختر الباقة...</option>
                                         @foreach($tripInstance->tripPassengerCategories ?? [] as $tier)
