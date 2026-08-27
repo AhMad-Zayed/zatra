@@ -19,6 +19,20 @@ class Tenant extends Model implements HasMedia
         $this->addMediaCollection('hero_image')->singleFile();
     }
 
+    /**
+     * Storefront redesign Phase B (Section D): the catalog hero previously served the raw
+     * original at whatever resolution it was uploaded, full-bleed and full-width. It's the
+     * page's above-the-fold LCP element so it stays eager-loaded (not lazy), but there's no
+     * reason to ship a resolution the display can't use -- this caps it to a real display size.
+     */
+    public function registerMediaConversions(?\Spatie\MediaLibrary\MediaCollections\Models\Media $media = null): void
+    {
+        $this->addMediaConversion('hero')
+            ->width(1920)
+            ->quality(80)
+            ->nonQueued();
+    }
+
     protected $fillable = [
         'name',
         'slug',

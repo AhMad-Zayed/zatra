@@ -59,20 +59,39 @@
 
         {{-- MASONRY GALLERY --}}
         @php
+            // Storefront redesign Phase B (Section D): every gallery image used to serve the raw
+            // original at whatever resolution it was uploaded. $mainImg is this page's above-the-
+            // fold LCP element (stays eager, no lazy-load); $img2/$img3/$img4 are secondary
+            // thumbnails and get loading="lazy" + a real srcset via the 'card'/'card-2x'
+            // conversions instead.
             $coverMedia = $template->getFirstMedia('cover');
             $galleryMedia = $template->getMedia('gallery') ?? collect();
             $mediaList = $coverMedia ? collect([$coverMedia])->merge($galleryMedia) : $galleryMedia;
-            
-            $mainImg = $mediaList->count() > 0 ? $mediaList[0]->getUrl() : asset('images/placeholder.jpg');
-            $img2 = $mediaList->count() > 1 ? $mediaList[1]->getUrl() : null;
-            $img3 = $mediaList->count() > 2 ? $mediaList[2]->getUrl() : null;
-            $img4 = $mediaList->count() > 3 ? $mediaList[3]->getUrl() : null;
-            
+
+            $urlFor = fn ($media) => $media ? ($media->getUrl('card') ?: $media->getUrl()) : null;
+            $url2xFor = fn ($media) => $media ? $media->getUrl('card-2x') : null;
+
+            $mainImg = $mediaList->count() > 0 ? $urlFor($mediaList[0]) : asset('images/placeholder.jpg');
+            $img2 = $mediaList->count() > 1 ? $urlFor($mediaList[1]) : null;
+            $img2_2x = $mediaList->count() > 1 ? $url2xFor($mediaList[1]) : null;
+            $img3 = $mediaList->count() > 2 ? $urlFor($mediaList[2]) : null;
+            $img3_2x = $mediaList->count() > 2 ? $url2xFor($mediaList[2]) : null;
+            $img4 = $mediaList->count() > 3 ? $urlFor($mediaList[3]) : null;
+            $img4_2x = $mediaList->count() > 3 ? $url2xFor($mediaList[3]) : null;
+
             $count = $mediaList->count();
         @endphp
         
         <div class="relative group">
-            @if($count == 0 || $count == 1)
+            @if($count == 0)
+                {{-- No cover/gallery media at all -- public/images/placeholder.jpg (the previous
+                     fallback here) doesn't actually exist in the repo, so this used to render a
+                     broken image icon instead of a graceful empty state. Matches the same
+                     gradient+icon placeholder the catalog card already uses. --}}
+                <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative bg-gradient-to-br from-zatara-blue/20 to-zatara-gold/20 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-zatara-blue/30 text-8xl">flight</span>
+                </div>
+            @elseif($count == 1)
                 <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative">
                     <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                 </div>
@@ -82,7 +101,10 @@
                         <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                     <div class="relative overflow-hidden group bg-slate-100 hidden md:block">
-                        <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        <img src="{{ $img2 }}"
+                             @if($img2_2x) srcset="{{ $img2 }} 800w, {{ $img2_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                 </div>
             @elseif($count == 3)
@@ -92,10 +114,16 @@
                     </div>
                     <div class="hidden md:grid grid-rows-2 gap-4">
                         <div class="relative overflow-hidden group bg-slate-100">
-                            <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                            <img src="{{ $img2 }}"
+                             @if($img2_2x) srcset="{{ $img2 }} 800w, {{ $img2_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                         </div>
                         <div class="relative overflow-hidden group bg-slate-100">
-                            <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                            <img src="{{ $img3 }}"
+                             @if($img3_2x) srcset="{{ $img3 }} 800w, {{ $img3_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                         </div>
                     </div>
                 </div>
@@ -105,13 +133,22 @@
                         <img src="{{ $mainImg }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                     <div class="col-span-2 md:col-span-1 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
-                        <img src="{{ $img2 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        <img src="{{ $img2 }}"
+                             @if($img2_2x) srcset="{{ $img2 }} 800w, {{ $img2_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                     <div class="col-span-2 md:col-span-1 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
-                        <img src="{{ $img3 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        <img src="{{ $img3 }}"
+                             @if($img3_2x) srcset="{{ $img3 }} 800w, {{ $img3_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                     <div class="col-span-4 md:col-span-2 row-span-1 relative overflow-hidden group bg-slate-100 hidden md:block">
-                        <img src="{{ $img4 }}" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
+                        <img src="{{ $img4 }}"
+                             @if($img4_2x) srcset="{{ $img4 }} 800w, {{ $img4_2x }} 1200w" sizes="50vw" @endif
+                             loading="lazy"
+                             class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt="{{ $template->title ?? 'صورة الرحلة' }}">
                     </div>
                 </div>
             @endif
@@ -336,7 +373,9 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto mt-10">
                 @foreach($mediaList as $media)
                     <div class="rounded-2xl overflow-hidden shadow-2xl">
-                        <img src="{{ $media->getUrl() }}" class="w-full h-auto object-cover hover:scale-105 transition-transform duration-500" alt="Trip Image">
+                        {{-- This whole modal is x-show hidden until the customer opens it, so
+                             every image in it is a genuine deferred-load candidate. --}}
+                        <img src="{{ $media->getUrl('card') ?: $media->getUrl() }}" loading="lazy" class="w-full h-auto object-cover hover:scale-105 transition-transform duration-500" alt="Trip Image">
                     </div>
                 @endforeach
             </div>

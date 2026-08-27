@@ -8,9 +8,11 @@
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div class="relative w-full h-[85vh] rounded-[2.5rem] overflow-hidden shadow-2xl shadow-zatara-blue/10 flex items-center justify-center">
             
-            {{-- Background Image with slow pan --}}
+            {{-- Background Image with slow pan. Above-the-fold LCP element -- eager-loaded on
+                 purpose (no loading="lazy"), but capped to the 'hero' conversion instead of
+                 whatever resolution it was originally uploaded at. --}}
             @php
-                $heroImage = $tenant->getFirstMediaUrl('hero_image');
+                $heroImage = $tenant->getFirstMediaUrl('hero_image', 'hero') ?: $tenant->getFirstMediaUrl('hero_image');
             @endphp
             @if($heroImage)
                 <img src="{{ $heroImage }}" alt="Hero Image" class="absolute inset-0 w-full h-full object-cover animate-slowPan" />
@@ -137,13 +139,23 @@
                     @endphp
                     <a href="{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $template->slug]) }}" class="group block relative rounded-3xl p-3 bg-white border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_20px_40px_rgba(43,50,128,0.08)] transition-all duration-500 hover:-translate-y-2">
                         
-                        {{-- Image Container --}}
+                        {{-- Image Container. Below-the-fold on any page with more than a couple of
+                             cards -- loading="lazy" plus a real srcset (Phase B, Section D) instead
+                             of always shipping the full-resolution original. --}}
                         <div class="relative w-full aspect-[4/3] rounded-[1.25rem] overflow-hidden mb-5">
                             @php
-                                $mediaUrl = $template->getFirstMediaUrl('cover') ?: ($firstInstance ? $firstInstance->getFirstMediaUrl('cover') : null);
+                                $mediaUrl = $template->getFirstMediaUrl('cover', 'card') ?: $template->getFirstMediaUrl('cover');
+                                $mediaUrl2x = $template->getFirstMediaUrl('cover', 'card-2x');
+                                if (!$mediaUrl && $firstInstance) {
+                                    $mediaUrl = $firstInstance->effectiveCoverUrl('card') ?: $firstInstance->effectiveCoverUrl();
+                                    $mediaUrl2x = $firstInstance->effectiveCoverUrl('card-2x');
+                                }
                             @endphp
                             @if($mediaUrl)
-                                <img src="{{ $mediaUrl }}" alt="{{ $template->title ?? 'صورة الرحلة' }}" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+                                <img src="{{ $mediaUrl }}"
+                                     @if($mediaUrl2x) srcset="{{ $mediaUrl }} 800w, {{ $mediaUrl2x }} 1200w" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw" @endif
+                                     loading="lazy"
+                                     alt="{{ $template->title ?? 'صورة الرحلة' }}" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
                             @else
                                 <div class="w-full h-full bg-gradient-to-br from-zatara-blue/20 to-zatara-gold/20 flex items-center justify-center">
                                     <span class="material-symbols-outlined text-zatara-blue/30 text-6xl">flight</span>

@@ -33,6 +33,24 @@ class TripInstance extends Model implements HasMedia
         $this->addMediaCollection('cover')->singleFile();
     }
 
+    /**
+     * Same 'card'/'card-2x' conversions as TripTemplate (storefront redesign Phase B, Section D)
+     * -- a TripInstance can have its own cover photo overriding the template's, so it needs the
+     * same resized/lazy-loadable variants, not just the raw original.
+     */
+    public function registerMediaConversions(?\Spatie\MediaLibrary\MediaCollections\Models\Media $media = null): void
+    {
+        $this->addMediaConversion('card')
+            ->width(800)
+            ->quality(80)
+            ->nonQueued();
+
+        $this->addMediaConversion('card-2x')
+            ->width(1200)
+            ->quality(75)
+            ->nonQueued();
+    }
+
     public function getEffectiveCoverUrlAttribute(): ?string
     {
         if ($this->hasMedia('cover')) {
@@ -40,6 +58,22 @@ class TripInstance extends Model implements HasMedia
         }
         if ($this->tripTemplate && $this->tripTemplate->hasMedia('cover')) {
             return $this->tripTemplate->getFirstMediaUrl('cover');
+        }
+        return null;
+    }
+
+    /**
+     * Conversion-aware counterpart to getEffectiveCoverUrlAttribute() above, added for the
+     * storefront redesign (Phase B) rather than changing that accessor's signature -- it's
+     * already consumed as-is by TripInstanceResource's admin table image column.
+     */
+    public function effectiveCoverUrl(string $conversion = ''): ?string
+    {
+        if ($this->hasMedia('cover')) {
+            return $this->getFirstMediaUrl('cover', $conversion) ?: $this->getFirstMediaUrl('cover');
+        }
+        if ($this->tripTemplate && $this->tripTemplate->hasMedia('cover')) {
+            return $this->tripTemplate->getFirstMediaUrl('cover', $conversion) ?: $this->tripTemplate->getFirstMediaUrl('cover');
         }
         return null;
     }

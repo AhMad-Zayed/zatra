@@ -20,6 +20,27 @@ class TripTemplate extends Model implements HasMedia
         $this->addMediaCollection('gallery');
     }
 
+    /**
+     * Storefront redesign Phase B (Section D): the catalog card and trip-details gallery
+     * previously served the raw, full-resolution original for every image, with no
+     * loading="lazy" and no responsive srcset -- a real, measured performance gap on a
+     * higher-traffic customer-facing surface. 'card' covers the catalog grid and gallery
+     * thumbnails; 'card-2x' is the same crop at double the width, so the view can offer a real
+     * srcset instead of one fixed size.
+     */
+    public function registerMediaConversions(?\Spatie\MediaLibrary\MediaCollections\Models\Media $media = null): void
+    {
+        $this->addMediaConversion('card')
+            ->width(800)
+            ->quality(80)
+            ->nonQueued();
+
+        $this->addMediaConversion('card-2x')
+            ->width(1200)
+            ->quality(75)
+            ->nonQueued();
+    }
+
     protected $fillable = [
         'tenant_id',
         'title',
