@@ -538,7 +538,15 @@
                             <span class="material-symbols-outlined text-[18px]">info</span>
                             تنبيه هام
                         </strong>
-                        بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بزتارة. سيتم تأكيد المقاعد فور الدفع بنجاح.
+                        {{-- Wording depends on payment method: cash/transfer defer actual payment (the very
+                             next screen, booking-success.blade.php, says the booking is "قيد الانتظار" --
+                             pending), so promising instant confirmation here contradicted it seconds later.
+                             Live-confirmed mismatch, docs/STOREFRONT_UX_AUDIT.md, Friction Point #6. --}}
+                        @if(in_array($paymentMethod, ['cash', 'transfer']))
+                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بزتارة. سيبقى حجزك قيد الانتظار وسيتم تأكيد المقاعد بعد استلام الدفع خلال المهلة المحددة.
+                        @else
+                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بزتارة. سيتم تأكيد المقاعد فور الدفع بنجاح.
+                        @endif
                     </div>
 
                     <div class="flex justify-between pt-6 border-t border-slate-100 mt-10">
