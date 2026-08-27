@@ -52,7 +52,7 @@
             <div class="glass-panel p-4 rounded-3xl shrink-0 text-center md:text-right hidden md:block">
                 <p class="text-xs text-slate-400 mb-1">السعر يبدأ من</p>
                 <div class="text-3xl font-black text-zatara-blue">
-                    {{ number_format($template->starting_price) }} <span class="text-base font-medium">دولار</span>
+                    {{ number_format($template->starting_price) }} <span class="text-base font-medium">{{ $template->currency ?? 'USD' }}</span>
                 </div>
             </div>
         </div>
@@ -184,7 +184,7 @@
                                 @else
                                     {{ number_format($template->starting_price) }}
                                 @endif
-                                <span class="text-lg font-medium text-slate-500">دولار</span>
+                                <span class="text-lg font-medium text-slate-500">{{ $template->currency ?? 'USD' }}</span>
                             </div>
                             @if($selectedInstance && $selectedInstance->remaining_seats <= 10 && $selectedInstance->remaining_seats > 0)
                                 <p class="text-xs text-zatara-red font-medium mt-2 bg-zatara-red/10 py-1 px-3 rounded-full inline-block">
@@ -212,7 +212,7 @@
                                             <option value="{{ $inst->id }}">
                                                 {{ $inst->start_date->format('d M, Y') }} 
                                                 @if($hasVariablePricing)
-                                                    - {{ number_format($inst->price_override ? $inst->price_override_amount : ($template->starting_price)) }}$
+                                                    - {{ number_format($inst->price_override ? $inst->price_override_amount : ($template->starting_price)) }} {{ $template->currency ?? 'USD' }}
                                                 @endif
                                             </option>
                                         @endforeach
@@ -275,13 +275,13 @@
                                             <div class="shrink-0 text-right">
                                                 @if($package->price_adjustment > 0)
                                                     <span class="text-zatara-gold font-black text-sm">
-                                                        +{{ number_format($package->price_adjustment) }}$
+                                                        +{{ number_format($package->price_adjustment) }} {{ $template->currency ?? 'USD' }}
                                                     </span>
                                                 @elseif($package->price_adjustment == 0)
                                                     <span class="text-green-600 font-bold text-xs">مشمول</span>
                                                 @else
                                                     <span class="text-green-600 font-bold text-xs">
-                                                        -{{ number_format(abs($package->price_adjustment)) }}$
+                                                        -{{ number_format(abs($package->price_adjustment)) }} {{ $template->currency ?? 'USD' }}
                                                     </span>
                                                 @endif
                                             </div>
@@ -294,7 +294,7 @@
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm text-slate-500">السعر النهائي</span>
                                     <span class="text-2xl font-black text-zatara-blue">
-                                        ${{ number_format($this->finalPrice) }}
+                                        {{ number_format($this->finalPrice) }} {{ $template->currency ?? 'USD' }}
                                     </span>
                                 </div>
                             </div>

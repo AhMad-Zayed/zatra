@@ -96,11 +96,11 @@
                         <div class="flex justify-between items-center mb-6 pt-4 border-t border-slate-700/50">
                             <div>
                                 <span class="block text-slate-400 text-xs">الإجمالي</span>
-                                <span class="font-bold text-lg text-slate-100">{{ number_format($booking->grand_total) }} ريال</span>
+                                <span class="font-bold text-lg text-slate-100">{{ number_format($booking->grand_total) }} {{ $booking->currency ?? 'USD' }}</span>
                             </div>
                             <div class="text-left">
                                 <span class="block text-slate-400 text-xs">المبلغ المتبقي</span>
-                                <span class="font-black text-xl text-amber-500">{{ number_format($booking->balance_due) }} ريال</span>
+                                <span class="font-black text-xl text-amber-500">{{ number_format($booking->balance_due) }} {{ $booking->currency ?? 'USD' }}</span>
                             </div>
                         </div>
 

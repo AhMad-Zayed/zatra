@@ -232,7 +232,7 @@
                                             class="glass-input w-full px-4 py-3 text-slate-800 bg-white transition-colors {{ $errors->has("form.passengers.{$index}.trip_passenger_category_id") ? 'border-zatara-red bg-zatara-red/5 focus:ring-zatara-red/20' : '' }}">
                                         <option value="">اختر الباقة...</option>
                                         @foreach($tripInstance->tripPassengerCategories ?? [] as $tier)
-                                            <option value="{{ $tier->id }}">{{ $tier->name }} ({{ number_format($tier->price) }} دولار)</option>
+                                            <option value="{{ $tier->id }}">{{ $tier->name }} ({{ number_format($tier->price) }} {{ $this->currency }})</option>
                                         @endforeach
                                     </select>
                                     @error("form.passengers.{$index}.trip_passenger_category_id") <span class="text-zatara-red text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
@@ -298,7 +298,7 @@
                                 <div class="mt-auto pt-4 border-t border-slate-100 group-has-[:checked]:border-zatara-gold/20 flex items-center justify-between">
                                     <span class="text-sm font-bold text-slate-400 group-has-[:checked]:text-zatara-gold">التكلفة الإضافية</span>
                                     <div class="font-black text-zatara-blue group-has-[:checked]:text-zatara-gold text-2xl">
-                                        +{{ number_format($addon->price, 2) }} SAR
+                                        +{{ number_format($addon->price, 2) }} {{ $this->currency }}
                                     </div>
                                 </div>
                             </label>
@@ -395,11 +395,11 @@
                         <div class="text-left shrink-0">
                             <div class="text-sm text-slate-400 mb-1">رسوم الباقة</div>
                             @if($packageOption->price_adjustment > 0)
-                                <div class="font-black text-zatara-gold text-xl">+${{ number_format($packageOption->price_adjustment) }}</div>
+                                <div class="font-black text-zatara-gold text-xl">+{{ number_format($packageOption->price_adjustment) }} {{ $this->currency }}</div>
                             @elseif($packageOption->price_adjustment == 0)
                                 <div class="font-black text-green-600 text-lg">مشمول مجاناً</div>
                             @else
-                                <div class="font-black text-green-600 text-xl">-${{ number_format(abs($packageOption->price_adjustment)) }}</div>
+                                <div class="font-black text-green-600 text-xl">-{{ number_format(abs($packageOption->price_adjustment)) }} {{ $this->currency }}</div>
                             @endif
                         </div>
                     </div>
@@ -418,12 +418,12 @@
                     <div class="space-y-4 relative z-10">
                         <div class="flex justify-between items-center text-white/80 border-b border-white/10 pb-4">
                             <span>الركاب ({{ count($form->passengers) }})</span>
-                            <span class="font-bold text-white">${{ number_format($this->grandTotal) }}</span>
+                            <span class="font-bold text-white">{{ number_format($this->grandTotal) }} {{ $this->currency }}</span>
                         </div>
-                        
+
                         <div class="flex justify-between items-center pt-2">
                             <span class="text-lg font-bold">الإجمالي المطلوب</span>
-                            <span class="text-3xl font-black text-zatara-gold">${{ number_format($this->grandTotal) }}</span>
+                            <span class="text-3xl font-black text-zatara-gold">{{ number_format($this->grandTotal) }} {{ $this->currency }}</span>
                         </div>
                     </div>
                 </div>

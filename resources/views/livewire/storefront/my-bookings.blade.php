@@ -106,16 +106,16 @@
                             <div class="bg-slate-50 rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-6 shadow-inner">
                                 <div>
                                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">الإجمالي</p>
-                                    <p class="text-xl font-bold text-gray-900">{{ number_format($booking->grand_total, 2) }} <span class="text-sm font-normal text-gray-500">SAR</span></p>
+                                    <p class="text-xl font-bold text-gray-900">{{ number_format($booking->grand_total, 2) }} <span class="text-sm font-normal text-gray-500">{{ $booking->currency ?? 'USD' }}</span></p>
                                 </div>
                                 <div>
                                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">المدفوع</p>
-                                    <p class="text-xl font-bold text-zatara-blue">{{ number_format($booking->total_paid, 2) }} <span class="text-sm font-normal text-zatara-blue/50">SAR</span></p>
+                                    <p class="text-xl font-bold text-zatara-blue">{{ number_format($booking->total_paid, 2) }} <span class="text-sm font-normal text-zatara-blue/50">{{ $booking->currency ?? 'USD' }}</span></p>
                                 </div>
                                 <div>
                                     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">المتبقي</p>
                                     <p class="text-xl font-bold {{ $booking->balance_due > 0 ? 'text-zatara-red' : 'text-teal-600' }}">
-                                        {{ number_format($booking->balance_due, 2) }} <span class="text-sm font-normal {{ $booking->balance_due > 0 ? 'text-zatara-red/70' : 'text-teal-400' }}">SAR</span>
+                                        {{ number_format($booking->balance_due, 2) }} <span class="text-sm font-normal {{ $booking->balance_due > 0 ? 'text-zatara-red/70' : 'text-teal-400' }}">{{ $booking->currency ?? 'USD' }}</span>
                                     </p>
                                 </div>
                             </div>

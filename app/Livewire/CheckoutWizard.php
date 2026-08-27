@@ -220,6 +220,21 @@ class CheckoutWizard extends Component
         return $total;
     }
 
+    /**
+     * Every price display in this wizard previously hardcoded "$"/"دولار" (passengers/total) or
+     * "SAR" (add-ons), regardless of the trip's actual configured currency -- live-confirmed as a
+     * real customer-facing inconsistency (docs/STOREFRONT_UX_AUDIT.md, Friction Point #4). This is
+     * the single source of truth the view now reads instead.
+     */
+    #[Livewire\Attributes\Computed]
+    public function getCurrencyProperty(): string
+    {
+        // TripInstance.currency (not the template's) is what CreateBookingService actually
+        // records on the resulting Booking -- matching it here keeps this display consistent
+        // with the real currency the booking will be created in.
+        return $this->tripInstance->currency ?? $this->tripInstance->tripTemplate->currency ?? 'USD';
+    }
+
     #[Livewire\Attributes\Computed]
     public function getGrandTotalProperty()
     {
