@@ -33,7 +33,7 @@ class StorefrontCatalog extends Component
             ->when($this->searchDestination, fn($q) => $q->where('title', 'like', '%'.$this->searchDestination.'%'))
             ->when($this->searchDate, fn($q) => $q->whereHas('tripInstances', fn($tq) => $tq->where('start_date', '>=', $this->searchDate)))
             ->with(['tripInstances' => function ($query) {
-                $query->bookable()->orderBy('start_date', 'asc');
+                $query->bookable()->orderBy('start_date', 'asc')->with('tripPassengerCategories');
             }, 'media'])
             ->paginate(9);
 

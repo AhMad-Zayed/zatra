@@ -97,12 +97,17 @@ class TripTemplate extends Model implements HasMedia
             return (float) $this->base_price;
         }
 
-        return (float) ($this->tripInstances()
-            ->bookable()
-            ->with('tripPassengerCategories')
-            ->get()
-            ->flatMap->tripPassengerCategories
-            ->min('price') ?? 0.0);
+        // A caller that already eager-loaded tripInstances (with tripPassengerCategories nested)
+        // gets that collection reused as-is -- querying fresh here regardless of what was already
+        // loaded was a measured N+1 on the catalog listing (5 queries -> 11 for a single card,
+        // confirmed while investigating the storefront redesign's Section D). Only a caller that
+        // never loaded the relation at all (e.g. the single-template trip details page) still
+        // pays for one fresh query here, which is fine at that scale.
+        $instances = $this->relationLoaded('tripInstances')
+            ? $this->tripInstances
+            : $this->tripInstances()->bookable()->with('tripPassengerCategories')->get();
+
+        return (float) ($instances->flatMap->tripPassengerCategories->min('price') ?? 0.0);
     }
 
     protected static function booted()
