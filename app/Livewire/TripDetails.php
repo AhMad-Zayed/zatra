@@ -32,7 +32,7 @@ class TripDetails extends Component
             
             // Check if prices differ
             $prices = $this->instances->map(function($i) {
-                return $i->price_override ? $i->price_override_amount : ($this->tripTemplate->base_price ?? 0);
+                return $i->price_override ? $i->price_override_amount : $this->tripTemplate->starting_price;
             })->unique();
             
             $this->hasVariablePricing = $prices->count() > 1;
@@ -57,12 +57,12 @@ class TripDetails extends Component
     {
         $selectedInstance = $this->instances->firstWhere('id', $this->selectedInstanceId);
         if (!$selectedInstance) {
-            return $this->tripTemplate->base_price ?? 0;
+            return $this->tripTemplate->starting_price;
         }
 
-        $base = $selectedInstance->price_override 
-            ? $selectedInstance->price_override_amount 
-            : ($this->tripTemplate->base_price ?? 0);
+        $base = $selectedInstance->price_override
+            ? $selectedInstance->price_override_amount
+            : $this->tripTemplate->starting_price;
             
         $adj = \App\Models\PackageOption::find($this->selectedPackageId)?->price_adjustment ?? 0;
         return $base + $adj;

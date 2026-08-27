@@ -187,7 +187,7 @@
                                 <div>
                                     <p class="text-xs text-slate-400 mb-0.5">تبدأ من</p>
                                     <div class="text-xl font-black text-zatara-blue">
-                                        {{ number_format($template->base_price ?? 0) }} <span class="text-sm font-medium">دولار</span>
+                                        {{ number_format($template->starting_price) }} <span class="text-sm font-medium">دولار</span>
                                     </div>
                                 </div>
                                 <button class="btn-secondary px-5 py-2.5 text-sm font-bold flex items-center gap-2 group-hover:bg-[#e09825]">

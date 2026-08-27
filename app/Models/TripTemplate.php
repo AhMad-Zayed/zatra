@@ -84,7 +84,27 @@ class TripTemplate extends Model implements HasMedia
     {
         return $this->belongsTo(RequirementPreset::class);
     }
-    
+
+    /**
+     * Storefront price display fallback: base_price is often left at 0 when a trip is actually
+     * priced entirely through its TripPassengerCategory records instead -- fixes the live-confirmed
+     * "0 دولار" display bug (docs/STOREFRONT_UX_AUDIT.md, Friction Point #2). Falls back to the
+     * lowest passenger-category price across this template's bookable instances.
+     */
+    public function getStartingPriceAttribute(): float
+    {
+        if ((float) $this->base_price > 0) {
+            return (float) $this->base_price;
+        }
+
+        return (float) ($this->tripInstances()
+            ->bookable()
+            ->with('tripPassengerCategories')
+            ->get()
+            ->flatMap->tripPassengerCategories
+            ->min('price') ?? 0.0);
+    }
+
     protected static function booted()
     {
         static::creating(function ($template) {

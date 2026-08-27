@@ -52,7 +52,7 @@
             <div class="glass-panel p-4 rounded-3xl shrink-0 text-center md:text-right hidden md:block">
                 <p class="text-xs text-slate-400 mb-1">السعر يبدأ من</p>
                 <div class="text-3xl font-black text-zatara-blue">
-                    {{ number_format($template->base_price ?? 0) }} <span class="text-base font-medium">دولار</span>
+                    {{ number_format($template->starting_price) }} <span class="text-base font-medium">دولار</span>
                 </div>
             </div>
         </div>
@@ -180,9 +180,9 @@
                             <p class="text-sm text-slate-400 mb-1">احجز مقعدك الآن</p>
                             <div class="text-4xl font-black text-zatara-blue">
                                 @if($hasVariablePricing && $selectedInstance)
-                                    {{ number_format($selectedInstance->price_override ? $selectedInstance->price_override_amount : ($template->base_price ?? 0)) }}
+                                    {{ number_format($selectedInstance->price_override ? $selectedInstance->price_override_amount : ($template->starting_price)) }}
                                 @else
-                                    {{ number_format($template->base_price ?? 0) }}
+                                    {{ number_format($template->starting_price) }}
                                 @endif
                                 <span class="text-lg font-medium text-slate-500">دولار</span>
                             </div>
@@ -212,7 +212,7 @@
                                             <option value="{{ $inst->id }}">
                                                 {{ $inst->start_date->format('d M, Y') }} 
                                                 @if($hasVariablePricing)
-                                                    - {{ number_format($inst->price_override ? $inst->price_override_amount : ($template->base_price ?? 0)) }}$
+                                                    - {{ number_format($inst->price_override ? $inst->price_override_amount : ($template->starting_price)) }}$
                                                 @endif
                                             </option>
                                         @endforeach
