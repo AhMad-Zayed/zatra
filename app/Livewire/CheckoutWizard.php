@@ -363,6 +363,14 @@ class CheckoutWizard extends Component
             'form.passengers.0.last_name' => 'required|string|max:255',
             'form.email' => 'required|email|max:255',
             'form.phone' => ['nullable', 'regex:/^\+?[0-9]{7,15}$/'],
+        ], attributes: [
+            // Without these, a validation failure literally reads "صيغة form.phone غير
+            // صحيحة" -- the raw internal field path leaked straight to the customer. Live-
+            // confirmed, docs/STOREFRONT_UX_AUDIT.md (Quick Win #1).
+            'form.passengers.0.first_name' => 'الاسم الأول',
+            'form.passengers.0.last_name' => 'اسم العائلة',
+            'form.email' => 'البريد الإلكتروني',
+            'form.phone' => 'رقم الجوال',
         ]);
 
         // Create Guest Session

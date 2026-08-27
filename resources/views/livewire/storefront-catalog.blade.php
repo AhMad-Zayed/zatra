@@ -67,12 +67,11 @@
                         <input type="text" wire:model.live="searchDate" placeholder="تاريخ السفر" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
                     </div>
 
-                    <div class="hidden md:block w-[1px] h-10 bg-zatara-blue/10"></div>
-
-                    <div class="flex-1 w-full relative">
-                        <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">group</span>
-                        <input type="text" placeholder="الضيوف (2 بالغين)" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
-                    </div>
+                    {{-- The "guests" field that used to sit here had no wire:model at all -- typing
+                         into it did nothing, implying a filter capability this search bar doesn't
+                         actually have. Live-confirmed, docs/STOREFRONT_UX_AUDIT.md (Quick Win #5).
+                         Removed rather than wired up, since there's no guest-count filter query to
+                         connect it to yet. --}}
 
                     <button class="btn-primary w-full md:w-auto px-10 py-4 text-lg font-bold flex items-center justify-center gap-2">
                         <span class="material-symbols-outlined">search</span>

@@ -49,27 +49,28 @@
 
         @if($this->guestSession)
             <div class="max-w-4xl mx-auto mb-6 bg-orange-100 text-orange-800 p-4 rounded-xl flex items-center justify-between font-bold"
-                 x-data="{ 
+                 x-data="{
                      expiresAt: new Date('{{ $this->guestSession->expires_at->toIso8601String() }}').getTime(),
                      now: new Date().getTime(),
                      distance: 0,
                      minutes: 0,
                      seconds: 0,
+                     tick() {
+                         this.now = new Date().getTime();
+                         this.distance = this.expiresAt - this.now;
+                         if (this.distance < 0) {
+                             window.location.href = '{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $tripInstance->tripTemplate->slug]) }}?expired=1';
+                         } else {
+                             this.minutes = Math.floor((this.distance % (1000 * 60 * 60)) / (1000 * 60));
+                             this.seconds = Math.floor((this.distance % (1000 * 60)) / 1000);
+                         }
+                     },
                      startTimer() {
-                         setInterval(() => {
-                             this.now = new Date().getTime();
-                             this.distance = this.expiresAt - this.now;
-                             if (this.distance < 0) {
-                                 window.location.href = '{{ route('storefront.trip.details', ['tenant' => $tenant->slug, 'tripTemplate' => $tripInstance->tripTemplate->slug]) }}?expired=1';
-                             } else {
-                                 this.minutes = Math.floor((this.distance % (1000 * 60 * 60)) / (1000 * 60));
-                                 this.seconds = Math.floor((this.distance % (1000 * 60)) / 1000);
-                             }
-                         }, 1000);
+                         setInterval(() => this.tick(), 1000);
                      }
                  }"
                  @timer-extended.window="expiresAt = new Date($event.detail.newTime).getTime(); distance = expiresAt - now;"
-                 x-init="startTimer()">
+                 x-init="tick(); startTimer()">
                 <div>
                     ⏱ مقاعدك محجوزة مؤقتاً لمدة: 
                     <span x-text="minutes"></span>:<span x-text="seconds < 10 ? '0' + seconds : seconds"></span>
@@ -100,7 +101,13 @@
                     <p class="text-slate-500 text-base mt-2">يرجى إدخال بياناتك الأساسية للبدء بإجراءات الحجز</p>
                 </div>
 
-                <form wire:submit.prevent="submitLeadCapture" class="max-w-md mx-auto space-y-6">
+                {{-- novalidate: the browser's own native validation tooltip for a malformed email
+                     ("Please include an '@'...") renders in English on this fully-Arabic page --
+                     live-confirmed, docs/STOREFRONT_UX_AUDIT.md (Quick Win #2). Server-side
+                     validation below already covers the same cases with a proper Arabic message;
+                     novalidate lets that show instead of the browser's own tooltip, while keeping
+                     type="email" for its mobile-keyboard benefit. --}}
+                <form wire:submit.prevent="submitLeadCapture" novalidate class="max-w-md mx-auto space-y-6">
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="first_name" class="block text-sm font-bold text-zatara-blue mb-2">الاسم الأول</label>

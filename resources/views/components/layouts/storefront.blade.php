@@ -58,7 +58,13 @@
                     @endif
                     <a href="#" class="hover:text-zatara-gold transition-colors">وجهاتنا</a>
                     <a href="#" class="hover:text-zatara-gold transition-colors">عن زتارة</a>
-                    <a href="#" class="hover:text-zatara-gold transition-colors">اتصل بنا</a>
+                    {{-- "اتصل بنا" pointed at "#" (dead link, no page behind it) -- live-confirmed,
+                         docs/STOREFRONT_UX_AUDIT.md (Quick Win #4). Routed to the same WhatsApp
+                         contact already used elsewhere on this exact layout rather than left dead;
+                         "وجهاتنا"/"عن زتارة" still have no real page to link to at all, so they're
+                         left as-is here -- inventing destination/about content is out of scope for
+                         a bugfix pass. --}}
+                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="hover:text-zatara-gold transition-colors">اتصل بنا</a>
                 </div>
 
                 {{-- Actions --}}
@@ -125,7 +131,7 @@
                 <a href="#" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">info</span> عن زتارة
                 </a>
-                <a href="#" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue flex items-center gap-3">
+                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">call</span> اتصل بنا
                 </a>
                 @if(isset($currentTenant))

@@ -69,6 +69,7 @@ class BookingForm extends Form
         return [
             'phone.required' => 'رقم الجوال مطلوب.',
             'phone.min' => 'رقم الجوال قصير جداً.',
+            'phone.regex' => 'صيغة رقم الجوال غير صحيحة.',
             'otp.size' => 'رمز التحقق يجب أن يتكون من 6 أرقام.',
             'passengers.*.first_name.required' => 'الاسم الأول مطلوب.',
             'passengers.*.last_name.required' => 'اسم العائلة مطلوب.',
