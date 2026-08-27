@@ -137,7 +137,7 @@
                         @error('form.phone') <span class="text-zatara-red text-xs mt-2 block font-medium">{{ $message }}</span> @enderror
                     </div>
 
-                    <button type="submit" class="btn-primary w-full shadow-lg shadow-zatara-blue/20">
+                    <button type="submit" class="btn-primary w-full">
                         متابعة
                     </button>
                 </form>
@@ -283,7 +283,7 @@
                     </button>
 
                     <div class="flex justify-end pt-6 border-t border-slate-100 mt-8">
-                        <button type="submit" class="btn-primary flex-1 shadow-lg shadow-zatara-blue/20" wire:loading.attr="disabled">
+                        <button type="submit" class="btn-primary flex-1" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="submitPassengers">متابعة</span>
                             <span wire:loading wire:target="submitPassengers">جاري الحفظ...</span>
                         </button>
@@ -301,7 +301,7 @@
                 <form wire:submit.prevent="submitAddons" class="space-y-4">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         @forelse($tripInstance->tripAddons ?? [] as $addon)
-                            <label wire:click.prevent="toggleAddon({{ $addon->id }})" class="relative flex flex-col p-6 bg-white/40 backdrop-blur-md border border-white/60 rounded-3xl cursor-pointer hover:border-zatara-gold hover:shadow-xl hover:-translate-y-1 transition-all duration-300 has-[:checked]:border-zatara-gold has-[:checked]:bg-gradient-to-br has-[:checked]:from-zatara-gold/10 has-[:checked]:to-transparent overflow-hidden group">
+                            <label wire:click.prevent="toggleAddon({{ $addon->id }})" class="relative flex flex-col p-6 bg-white border border-slate-100 rounded-3xl cursor-pointer hover:border-zatara-gold transition-all duration-200 has-[:checked]:border-zatara-gold has-[:checked]:bg-zatara-gold/5 overflow-hidden group">
                                 <input type="checkbox" 
                                        @if(collect($form->addons)->contains('trip_addon_id', $addon->id)) checked @endif
                                        class="absolute top-6 left-6 w-6 h-6 rounded-lg border-slate-300 text-zatara-gold focus:ring-zatara-gold/50 cursor-pointer">
@@ -379,7 +379,7 @@
                         <button type="button" wire:click="$set('currentStep', 2)" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-4 px-8 rounded-2xl transition-all">
                             السابق
                         </button>
-                        <button type="submit" class="btn-primary shadow-lg shadow-zatara-blue/20 px-12 py-4 text-lg">
+                        <button type="submit" class="btn-primary px-12 py-4 text-lg">
                             <span wire:loading wire:target="submitAddons">جاري المعالجة...</span>
                             <span wire:loading.remove wire:target="submitAddons">متابعة للدفع</span>
                         </button>

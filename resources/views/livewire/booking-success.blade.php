@@ -114,7 +114,7 @@
             <!-- Actions -->
             <div class="max-w-2xl mx-auto mt-8 flex flex-col sm:flex-row gap-4 justify-center">
                 <button type="button" wire:click="downloadPdf" wire:loading.attr="disabled"
-                        class="flex-1 bg-zatara-blue text-white px-8 py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-zatara-blue/20 relative">
+                        class="flex-1 bg-zatara-blue text-white px-8 py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 relative">
                     <span wire:loading.remove wire:target="downloadPdf" class="flex items-center gap-2">
                         <span class="material-symbols-outlined animate-bounce">download</span>
                         {{ $booking->payment_status === \App\Enums\PaymentStatus::Unpaid ? 'تحميل إيصال مؤقت (PDF)' : 'تحميل التذكرة (PDF)' }}
@@ -128,7 +128,7 @@
                     </span>
                 </button>
                 <a href="https://wa.me/{{ $booking->tenant->settings['whatsapp'] ?? '1234567890' }}?text={{ urlencode('مرحباً زتارة، أود الدفع عبر التحويل البنكي لحجزي المبدئي رقم: ' . $booking->pnr) }}" target="_blank"
-                    class="flex-1 bg-[#25D366] text-white px-8 py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#25D366]/20">
+                    class="flex-1 bg-[#25D366] text-white px-8 py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined">chat</span>
                     تواصل معنا (واتساب)
                 </a>
