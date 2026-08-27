@@ -90,6 +90,40 @@ class CheckoutWizard extends Component
 
         if (Auth::guard('customer')->check() || $guest) {
             $this->currentStep = 2;
+
+            // Refresh-resilience: a hard refresh at Step 2 previously discarded every typed
+            // passenger entry (including the customer's own name, auto-filled from Step 1) while
+            // the seat hold/countdown kept ticking unaffected -- live-reproduced and documented in
+            // docs/STOREFRONT_UX_AUDIT.md (Friction Point #3). Session-scoped (not
+            // GuestSession-scoped) so this also covers logged-in customers, who have no
+            // GuestSession row at all. Only restored on a genuine resume (guest session or auth
+            // check above already passed), never on a brand-new visit.
+            $draft = session($this->passengersDraftSessionKey());
+            if (is_array($draft) && !empty($draft)) {
+                $this->form->passengers = $draft;
+            }
+        }
+    }
+
+    private function passengersDraftSessionKey(): string
+    {
+        return "checkout_passengers_draft_{$this->tripInstance->id}";
+    }
+
+    private function savePassengersDraft(): void
+    {
+        session()->put($this->passengersDraftSessionKey(), $this->form->passengers);
+    }
+
+    /**
+     * Livewire's generic per-property update hook (fires for every wire:model commit, including
+     * nested/dotted paths like "form.passengers.0.first_name") -- keeps the session draft current
+     * as the customer types, without a dedicated method per field.
+     */
+    public function updated($name, $value)
+    {
+        if (str_starts_with($name, 'form.passengers')) {
+            $this->savePassengersDraft();
         }
     }
 
@@ -114,6 +148,7 @@ class CheckoutWizard extends Component
             return;
         }
         $this->form->addPassenger();
+        $this->savePassengersDraft();
     }
 
     #[Livewire\Attributes\Computed]
@@ -279,6 +314,7 @@ class CheckoutWizard extends Component
     public function removePassenger($index)
     {
         $this->form->removePassenger($index);
+        $this->savePassengersDraft();
     }
 
     public function toggleAddon($addonId)
@@ -351,6 +387,7 @@ class CheckoutWizard extends Component
         session()->put('guest_session_id', $guestSession->id);
 
         $this->currentStep = 2; // Move to Passenger details
+        $this->savePassengersDraft(); // Passenger #1's name is already pre-filled from Step 1 -- persist it immediately so an early refresh doesn't lose it.
     }
 
     public function extendTimer()
@@ -528,6 +565,7 @@ class CheckoutWizard extends Component
             // Call the refactored Service
             $booking = $bookingService->execute($payload);
             $this->booking_id = $booking->id;
+            session()->forget($this->passengersDraftSessionKey());
 
             // Phase 13: Conversion Hook - Mark Waiting List as Converted
             if ($this->wl_id) {
