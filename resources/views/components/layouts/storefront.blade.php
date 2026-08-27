@@ -10,10 +10,12 @@
     <meta property="og:type" content="website">
     <title>{{ $title ?? ($currentTenant->name ?? 'Zatara Tours & Travel') }}</title>
 
-    {{-- Google Fonts: Tajawal + Cairo --}}
+    {{-- Redesign Phase A: typography now matches the admin panel (IBM Plex Sans Arabic,
+         AdminPanelProvider.php:50) instead of Tajawal/Cairo -- app.css's @theme already imports
+         the face; Material Symbols is a separate icon font, kept here. --}}
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=Cairo:wght@400;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
@@ -21,7 +23,7 @@
 
     <style>
         body {
-            font-family: 'Tajawal', 'Cairo', sans-serif;
+            font-family: 'IBM Plex Sans Arabic', 'Tajawal', sans-serif;
             background-color: #FFFFFF;
         }
         /* Scrollbar */
@@ -32,8 +34,15 @@
 <body class="antialiased min-h-screen flex flex-col text-slate-800">
 
     {{-- ========================== NAVIGATION ========================== --}}
-    <nav x-data="{ scrolled: false, mobileOpen: false }" 
-         @scroll.window="scrolled = (window.pageYOffset > 50)"
+    {{-- The unscrolled nav is transparent with white text/logo, meant to overlay a dark full-
+         height hero image -- only the catalog homepage actually has one. Every other page (trip
+         details, checkout, booking success, my-bookings, login, legal docs, the magic-link
+         portal) starts with a plain white/light background, so that same white-on-transparent nav
+         rendered as white-on-white -- effectively invisible logo and nav links on 8 of 9 screens.
+         Live-confirmed while verifying Phase A. `scrolled` now starts pre-set to true (readable,
+         opaque nav) everywhere except the one page that genuinely has a dark hero behind it. --}}
+    <nav x-data="{ scrolled: {{ request()->routeIs('storefront.catalog') ? 'false' : 'true' }}, mobileOpen: false }"
+         @scroll.window="scrolled = (window.pageYOffset > 50) || {{ request()->routeIs('storefront.catalog') ? 'false' : 'true' }}"
          :class="scrolled ? 'glass-panel border-b-0' : 'bg-transparent'"
          class="fixed top-0 w-full z-50 transition-all duration-500">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-16">
