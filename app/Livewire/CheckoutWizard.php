@@ -227,6 +227,18 @@ class CheckoutWizard extends Component
 
     // Mirrors CreateBookingService/RoomInventoryService's pricing formula exactly, for display
     // only — the server independently recomputes and is the source of truth at booking time.
+    // Public (not the per-charge total below) so the Step 3 room selector can show each room
+    // type's real price at the point of choice instead of only after reaching Step 4 -- the other
+    // half of Friction Point #5.
+    public function roomTypePricePerRoom(\App\Models\RoomType $roomType, string $occupancyType): float
+    {
+        if ($occupancyType === 'single') {
+            return (float) $roomType->price_adjustment_shared + (float) $roomType->price_adjustment_single_supplement;
+        }
+
+        return (float) $roomType->price_adjustment_shared * $roomType->capacity_per_room;
+    }
+
     private function estimateRoomCharges(): float
     {
         if (!$this->roomBookingAvailable || empty($this->roomSelections)) {
@@ -242,14 +254,8 @@ class CheckoutWizard extends Component
                 continue;
             }
 
-            $perRoom = (float) $roomType->price_adjustment_shared;
-            if (($selection['occupancy_type'] ?? 'shared') === 'single') {
-                $perRoom += (float) $roomType->price_adjustment_single_supplement;
-            } else {
-                $perRoom *= $roomType->capacity_per_room;
-            }
-
-            $total += $perRoom * (int) $selection['quantity'];
+            $occupancyType = $selection['occupancy_type'] ?? 'shared';
+            $total += $this->roomTypePricePerRoom($roomType, $occupancyType) * (int) $selection['quantity'];
         }
 
         return $total;
@@ -270,12 +276,21 @@ class CheckoutWizard extends Component
         return $this->tripInstance->currency ?? $this->tripInstance->tripTemplate->currency ?? 'USD';
     }
 
+    /**
+     * Step 4's order summary previously showed one line labeled "الركاب (N)" whose amount was
+     * actually already the full grand total (passengers + rooms + add-ons + package, all silently
+     * combined) -- a family booking's room surcharge was invisible both at Step 3's selection
+     * point and here, folded into a line that claimed to be passengers-only. Live-confirmed in
+     * docs/STOREFRONT_UX_AUDIT.md (Friction Point #5): a $90 room charge added at Step 3 only ever
+     * showed up baked into this mislabeled total. Split into real, independent subtotals below so
+     * the view can show each cost component on its own line.
+     */
     #[Livewire\Attributes\Computed]
-    public function getGrandTotalProperty()
+    public function getPassengersSubtotalProperty(): float
     {
-        $total = 0;
         $overrideAmount = $this->tripInstance->price_override ? $this->tripInstance->price_override_amount : 0;
 
+        $total = 0;
         $categories = $this->tripInstance->tripPassengerCategories->keyBy('id');
         foreach ($this->form->passengers as $p) {
             $tierId = $p['trip_passenger_category_id'] ?? null;
@@ -284,6 +299,13 @@ class CheckoutWizard extends Component
             }
         }
 
+        return $total;
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function getAddonsSubtotalProperty(): float
+    {
+        $total = 0;
         $addons = $this->tripInstance->tripAddons->keyBy('id');
         foreach ($this->form->addons as $a) {
             $addonId = $a['trip_addon_id'] ?? null;
@@ -292,11 +314,23 @@ class CheckoutWizard extends Component
             }
         }
 
+        return $total;
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function getRoomsSubtotalProperty(): float
+    {
+        return $this->estimateRoomCharges();
+    }
+
+    #[Livewire\Attributes\Computed]
+    public function getGrandTotalProperty()
+    {
+        $total = $this->passengersSubtotal + $this->addonsSubtotal + $this->roomsSubtotal;
+
         if ($this->packageOption) {
             $total += $this->packageOption->price_adjustment;
         }
-
-        $total += $this->estimateRoomCharges();
 
         return max(0, $total);
     }

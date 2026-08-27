@@ -327,6 +327,11 @@
                                                 {{ $row['hotel_option_label'] }}
                                                 @if($row['leg_label']) &middot; {{ $row['leg_label'] }} @endif
                                             </p>
+                                            <p class="text-xs text-zatara-gold font-bold mt-1">
+                                                مشاركة: {{ number_format($this->roomTypePricePerRoom($roomType, 'shared')) }} {{ $this->currency }}/الغرفة
+                                                &middot;
+                                                فردي: {{ number_format($this->roomTypePricePerRoom($roomType, 'single')) }} {{ $this->currency }}/الغرفة
+                                            </p>
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <label class="text-xs text-slate-500">العدد</label>
@@ -415,11 +420,29 @@
                         ملخص الحجز
                     </h3>
                     
+                    {{-- Each cost component gets its own line -- previously "الركاب" silently
+                         included room/add-on charges too, so a customer could never see what a
+                         room actually cost them even after reaching this step
+                         (docs/STOREFRONT_UX_AUDIT.md, Friction Point #5). --}}
                     <div class="space-y-4 relative z-10">
                         <div class="flex justify-between items-center text-white/80 border-b border-white/10 pb-4">
                             <span>الركاب ({{ count($form->passengers) }})</span>
-                            <span class="font-bold text-white">{{ number_format($this->grandTotal) }} {{ $this->currency }}</span>
+                            <span class="font-bold text-white">{{ number_format($this->passengersSubtotal) }} {{ $this->currency }}</span>
                         </div>
+
+                        @if($this->roomsSubtotal > 0)
+                            <div class="flex justify-between items-center text-white/80 border-b border-white/10 pb-4">
+                                <span>الغرف</span>
+                                <span class="font-bold text-white">{{ number_format($this->roomsSubtotal) }} {{ $this->currency }}</span>
+                            </div>
+                        @endif
+
+                        @if($this->addonsSubtotal > 0)
+                            <div class="flex justify-between items-center text-white/80 border-b border-white/10 pb-4">
+                                <span>الإضافات</span>
+                                <span class="font-bold text-white">{{ number_format($this->addonsSubtotal) }} {{ $this->currency }}</span>
+                            </div>
+                        @endif
 
                         <div class="flex justify-between items-center pt-2">
                             <span class="text-lg font-bold">الإجمالي المطلوب</span>
