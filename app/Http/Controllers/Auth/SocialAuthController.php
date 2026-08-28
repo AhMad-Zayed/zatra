@@ -91,7 +91,22 @@ class SocialAuthController extends Controller
             'expires_at' => now()->addMinutes(10)->timestamp,
         ]]);
 
-        app(CustomerOtpService::class)->sendOtp($tenant, $customer->email);
+        try {
+            app(CustomerOtpService::class)->sendOtp($tenant, $customer->email);
+        } catch (\Exception $e) {
+            // Unlike every other sendOtp() caller (CustomerLogin, CompleteProfile), this one
+            // wasn't wrapped -- a delivery failure (e.g. OtpDeliveryException, missing mail
+            // config) would surface as a raw 500 instead of the same graceful error every other
+            // caller already shows. Mirror this controller's own existing error-handling
+            // convention (the Socialite-failure catch just above): forget the half-started link
+            // attempt and redirect back with the same error message the OTP service itself
+            // already produces, rather than sending the customer to a "check your email/WhatsApp"
+            // screen for a code that was never actually sent.
+            session()->forget('pending_social_link');
+
+            return redirect()->route('storefront.catalog', ['tenant' => $tenant->slug])
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()->route('social.confirm-link', ['tenant' => $tenant->slug]);
     }
