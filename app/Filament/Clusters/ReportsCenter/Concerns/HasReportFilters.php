@@ -9,6 +9,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 /**
  * Reports Center shared filter shell (date range / trip / trip_type), per Phase 0 Section C —
@@ -47,16 +48,16 @@ trait HasReportFilters
                 ])
                 ->query(fn (Builder $query, array $data): Builder => $applyDateRange(
                     $query,
-                    $data['date_from'] ?? null,
-                    $data['date_to'] ?? null,
+                    $this->normalizeReportFilterDate($data['date_from'] ?? null),
+                    $this->normalizeReportFilterDate($data['date_to'] ?? null),
                 ))
                 ->indicateUsing(function (array $data): array {
                     $indicators = [];
-                    if ($data['date_from'] ?? null) {
-                        $indicators[] = 'من: ' . $data['date_from'];
+                    if ($from = $this->normalizeReportFilterDate($data['date_from'] ?? null)) {
+                        $indicators[] = 'من: ' . $from;
                     }
-                    if ($data['date_to'] ?? null) {
-                        $indicators[] = 'إلى: ' . $data['date_to'];
+                    if ($to = $this->normalizeReportFilterDate($data['date_to'] ?? null)) {
+                        $indicators[] = 'إلى: ' . $to;
                     }
 
                     return $indicators;
@@ -81,5 +82,28 @@ trait HasReportFilters
                 ->options(TripTypeEnum::class)
                 ->query(fn (Builder $query, array $data): Builder => $applyTripType($query, $data['value'] ?? null)),
         ];
+    }
+
+    /**
+     * Filament's DatePicker, with ->native(false), always stringifies its state through
+     * Carbon::createFromFormat('Y-m-d', ...) -- which, given a date-only format, fills the
+     * unspecified time portion with the current wall-clock time rather than midnight -- then
+     * casts that to a string, producing a full "Y-m-d H:i:s" timestamp for what's meant to be a
+     * plain date. Every report using this trait's date_range filter then feeds that value into
+     * whereDate($column, '>=', $from) as a raw string: DATE($column) is compared lexicographically
+     * against the timestamp, and for a same-day boundary "2026-08-29" >= "2026-08-29 21:49:30" is
+     * false, silently excluding today's own rows any time other than exactly midnight. Re-parsing
+     * here and keeping only the date guarantees every $applyDateRange closure (and the filter
+     * indicator) always sees a pure start-of-day boundary, regardless of what Filament's hydration
+     * produced -- this is the single choke point every report's date filter passes through, so
+     * fixing it here fixes it for all of them at once, current and future.
+     */
+    private function normalizeReportFilterDate(?string $date): ?string
+    {
+        if (blank($date)) {
+            return null;
+        }
+
+        return Carbon::parse($date)->toDateString();
     }
 }

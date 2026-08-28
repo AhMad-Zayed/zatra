@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\CreateBookingService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -35,6 +36,12 @@ class PreDepartureReadinessReportTest extends TestCase
     {
         parent::setUp();
         $this->createBookingService = new CreateBookingService();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     private function makeAgencyAdmin(Tenant $tenant, string $phone): User
@@ -151,6 +158,30 @@ class PreDepartureReadinessReportTest extends TestCase
         $passenger->update(['requirements_complete' => true]);
 
         $this->loadReport($f)->assertCanNotSeeTableRecords([$passenger]);
+    }
+
+    /**
+     * Regression for the audit's Friction Point #1: Filament's DatePicker, under ->native(false),
+     * hydrates a date-only default into a Carbon instance via Carbon::createFromFormat('Y-m-d', ...)
+     * -- which fills the unspecified time with the current wall-clock time -- then stringifies it
+     * as a full "Y-m-d H:i:s" timestamp. Every report's applyDateRange closure fed that into
+     * whereDate($column, '>=', $from), and DATE($column) compared lexicographically against a
+     * timestamp string excludes today's own rows at any time other than exactly midnight. Freeze
+     * "now" at a realistic evening time (not midnight) specifically so this doesn't accidentally
+     * pass by luck of the clock, and assert the passenger is visible under the report's own
+     * DEFAULT filter state -- no filterTable() call here, unlike every other filter test above.
+     */
+    public function test_report_shows_todays_incomplete_passenger_under_the_default_filter_at_a_realistic_time_of_day(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-29 21:49:30'));
+
+        $f = $this->makeTenantFixture('011');
+        $tripToday = $this->makeTripInstance($f, '011', 0);
+        $booking = $this->makeBooking($f, $tripToday, 'TodayIncomplete', documentNumber: null, dob: null);
+        $passenger = $booking->passengers()->first();
+        $this->assertFalse($passenger->fresh()->requirements_complete, 'Fixture sanity check: CreateBookingService must have flagged this passenger incomplete.');
+
+        $this->loadReport($f)->assertCanSeeTableRecords([$passenger]);
     }
 
     public function test_report_excludes_trips_outside_the_default_departure_window(): void
