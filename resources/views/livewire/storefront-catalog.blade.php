@@ -101,12 +101,63 @@
         </div>
     </section>
 
-    {{-- BENTO GRID TRIP CARDS --}}
+    {{-- BENTO GRID TRIP CARDS + FILTER SIDEBAR --}}
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
+      <div class="flex flex-col lg:flex-row gap-8 items-start">
+
+        {{-- Storefront redesign Phase F, item 1: filter sidebar. Functional idea only (price
+             range + category filter), not a copy of any particular mockup's visual treatment. --}}
+        <aside class="w-full lg:w-72 shrink-0 bg-white border border-slate-100 rounded-3xl p-6 lg:sticky lg:top-24">
+            <h3 class="text-lg font-bold text-zatara-blue mb-6">تصفية النتائج</h3>
+
+            <div class="mb-8">
+                <p class="text-sm font-bold text-slate-500 mb-3">نطاق السعر</p>
+                <div class="flex items-center gap-3">
+                    <div class="flex-1">
+                        <label class="text-xs text-slate-400 block mb-1">من</label>
+                        <input type="number" min="0" wire:model.live.debounce.500ms="priceMin"
+                               placeholder="0" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-xs text-slate-400 block mb-1">إلى</label>
+                        <input type="number" min="0" wire:model.live.debounce.500ms="priceMax"
+                               placeholder="{{ $priceCeiling }}" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
+                    </div>
+                </div>
+            </div>
+
+            @if(count($categoryOptions) > 0)
+                <div>
+                    <p class="text-sm font-bold text-slate-500 mb-3">الفئة</p>
+                    <div class="space-y-2">
+                        @foreach($categoryOptions as $option)
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model.live="categories" value="{{ $option->value }}"
+                                       class="w-4 h-4 rounded border-slate-300 text-zatara-blue focus:ring-zatara-blue/40">
+                                <span class="text-sm text-slate-600 font-medium">{{ $option->getLabel() }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
+            @if($priceMin !== null || $priceMax !== null || !empty($categories))
+                <button type="button" wire:click="resetFilters"
+                        class="mt-6 text-sm text-zatara-gold hover:text-zatara-blue font-bold transition-colors">
+                    إعادة ضبط التصفية
+                </button>
+            @endif
+        </aside>
+
+        <div class="flex-1 w-full min-w-0">
         @if($tripTemplates->isEmpty())
             <div class="glass-panel rounded-3xl p-20 text-center">
                 <span class="material-symbols-outlined text-6xl text-slate-300 mb-4 block">luggage</span>
-                <p class="text-slate-500 font-medium text-xl">نقوم بتجهيز باقات استثنائية قريباً.</p>
+                @if($priceMin !== null || $priceMax !== null || !empty($categories) || $searchDestination || $searchDate)
+                    <p class="text-slate-500 font-medium text-xl">لا توجد رحلات مطابقة لخيارات التصفية الحالية.</p>
+                @else
+                    <p class="text-slate-500 font-medium text-xl">نقوم بتجهيز باقات استثنائية قريباً.</p>
+                @endif
             </div>
         @else
             <!-- Skeleton Loading State -->
@@ -209,12 +260,14 @@
                     </a>
                 @endforeach
             </div>
-        @endif
-    </section>
 
-    {{-- Pagination --}}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
-        {{ $tripTemplates->links() }}
-    </div>
+            {{-- Pagination --}}
+            <div class="mt-8">
+                {{ $tripTemplates->links() }}
+            </div>
+        @endif
+        </div>
+      </div>
+    </section>
 
 </div>

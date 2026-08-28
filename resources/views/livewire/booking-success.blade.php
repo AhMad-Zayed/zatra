@@ -134,7 +134,17 @@
                 </a>
             </div>
             
-            <div class="text-center mt-12">
+            {{-- Storefront redesign Phase F, item 4: a direct path to the booking list right from
+                 confirmation, instead of only "back to home". Works for guest bookers too --
+                 booking.success itself has no auth:customer middleware, so an unauthenticated
+                 booker following this link simply gets bounced to login first (same phone number
+                 used at checkout), same as visiting storefront.my-bookings directly ever would. --}}
+            <div class="text-center mt-12 flex items-center justify-center gap-8">
+                <a href="{{ route('storefront.my-bookings', ['tenant' => $booking->tenant->slug]) }}" class="text-zatara-blue hover:text-zatara-gold font-bold transition-colors inline-flex items-center gap-2">
+                    إدارة حجوزاتي
+                    <span class="material-symbols-outlined text-[18px]">luggage</span>
+                </a>
+                <span class="w-px h-5 bg-slate-200"></span>
                 <a href="{{ route('storefront.catalog', ['tenant' => $booking->tenant->slug]) }}" class="text-zatara-blue hover:text-zatara-gold font-bold transition-colors inline-flex items-center gap-2">
                     العودة للصفحة الرئيسية
                     <span class="material-symbols-outlined text-[18px]">arrow_forward</span>

@@ -264,6 +264,26 @@ class TripTemplateResource extends Resource
                             ->defaultItems(0)
                             ->addActionLabel('إضافة متطلب'),
                     ]),
+
+                Forms\Components\Section::make('خطة الرحلة (يوماً بيوم)')
+                    ->description('يظهر هذا القسم للعميل في صفحة تفاصيل الرحلة. إن تُرك فارغاً، لن يظهر قسم "مسار الرحلة" في الصفحة إطلاقاً.')
+                    ->schema([
+                        Forms\Components\Repeater::make('itinerary_data')
+                            ->label('أيام الرحلة')
+                            ->schema([
+                                Forms\Components\TextInput::make('title')
+                                    ->label('عنوان اليوم (مثال: اليوم الأول: الوصول والاستقبال)')
+                                    ->required(),
+                                Forms\Components\Textarea::make('description')
+                                    ->label('الوصف')
+                                    ->rows(2),
+                            ])
+                            ->columns(1)
+                            ->defaultItems(0)
+                            ->addActionLabel('إضافة يوم')
+                            ->reorderable()
+                            ->collapsible(),
+                    ]),
             ]);
     }
 

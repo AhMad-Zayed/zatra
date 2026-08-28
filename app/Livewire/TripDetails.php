@@ -25,6 +25,7 @@ class TripDetails extends Component
         $this->instances = $this->tripTemplate->tripInstances()
             ->bookable()
             ->orderBy('start_date', 'asc')
+            ->with('tripPassengerCategories')
             ->get();
             
         if ($this->instances->isNotEmpty()) {

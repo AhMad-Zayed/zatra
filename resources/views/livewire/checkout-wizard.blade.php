@@ -440,7 +440,28 @@
                         <span class="material-symbols-outlined">receipt_long</span>
                         ملخص الحجز
                     </h3>
-                    
+
+                    {{-- Storefront redesign Phase F, item 3: trip photo + dates context, so the
+                         customer sees WHAT they're paying for right before the biggest commitment
+                         step, not just a number. All data already loaded on $tripInstance --
+                         display-layer only, no change to how the total itself is computed. --}}
+                    @php($summaryImg = $tripInstance->tripTemplate?->getFirstMediaUrl('cover', 'card') ?: ($tripInstance->tripTemplate?->getFirstMediaUrl('cover') ?: $tripInstance->effectiveCoverUrl('card')))
+                    <div class="flex items-center gap-4 mb-6 pb-6 border-b border-white/10 relative z-10">
+                        @if($summaryImg)
+                            <img src="{{ $summaryImg }}" alt="" class="w-16 h-16 rounded-xl object-cover shrink-0">
+                        @else
+                            <div class="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-outlined text-white/60">flight</span>
+                            </div>
+                        @endif
+                        <div>
+                            <h4 class="font-bold text-white">{{ $tripInstance->tripTemplate?->title }}</h4>
+                            <p class="text-sm text-white/70" dir="ltr">
+                                {{ $tripInstance->start_date->format('d M Y') }} - {{ $tripInstance->end_date->format('d M Y') }}
+                            </p>
+                        </div>
+                    </div>
+
                     {{-- Each cost component gets its own line -- previously "الركاب" silently
                          included room/add-on charges too, so a customer could never see what a
                          room actually cost them even after reaching this step

@@ -177,6 +177,40 @@
                     </div>
                 </div>
 
+                {{-- Storefront redesign Phase F, item 2: per-category price breakdown, surfaced
+                     here instead of staying hidden until checkout Step 2. Reuses
+                     tripPassengerCategories exactly as already loaded for $selectedInstance --
+                     no new query, no change to CreateBookingService/checkout pricing logic. --}}
+                @if($selectedInstance && $selectedInstance->tripPassengerCategories->isNotEmpty())
+                    <div class="mb-12">
+                        <h2 class="text-2xl font-bold text-zatara-blue mb-6">تفاصيل الأسعار</h2>
+                        <div class="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+                            <table class="w-full text-right">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-100">
+                                        <th class="px-6 py-3 text-sm font-bold text-slate-500">الفئة</th>
+                                        <th class="px-6 py-3 text-sm font-bold text-slate-500">السعر (للشخص)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($selectedInstance->tripPassengerCategories as $category)
+                                        <tr class="border-b border-slate-100 last:border-b-0">
+                                            <td class="px-6 py-4 font-medium text-slate-700">{{ $category->name }}</td>
+                                            <td class="px-6 py-4 font-bold text-zatara-blue">
+                                                @if((float) $category->price > 0)
+                                                    {{ number_format($category->price) }} {{ $template->currency ?? 'USD' }}
+                                                @else
+                                                    <span class="text-teal-600">مجاناً</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Interactive Itinerary Timeline --}}
                 <div class="mb-12">
                     <h2 class="text-2xl font-bold text-zatara-blue mb-8">مسار الرحلة الممتع</h2>
