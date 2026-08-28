@@ -27,6 +27,16 @@ class BookingsRelationManager extends RelationManager
     protected static ?string $title = 'الحجوزات';
     protected static ?string $icon = 'heroicon-o-ticket';
 
+    public static function getModelLabel(): string
+    {
+        return 'حجز';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الحجوزات';
+    }
+
     public function table(Table $table): Table
     {
         return $table

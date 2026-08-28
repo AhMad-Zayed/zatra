@@ -12,6 +12,16 @@ class TripPassengersRelationManager extends RelationManager
     protected static ?string $title = 'جميع الركاب';
     protected static ?string $icon = 'heroicon-o-users';
 
+    public static function getModelLabel(): string
+    {
+        return 'راكب';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الركاب';
+    }
+
     public function table(Table $table): Table
     {
         return $table

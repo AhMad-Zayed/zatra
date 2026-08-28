@@ -19,6 +19,16 @@ class BookingsRelationManager extends RelationManager
         return 'حجوزات العميل';
     }
 
+    public static function getModelLabel(): string
+    {
+        return 'حجز';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الحجوزات';
+    }
+
     public function form(Form $form): Form
     {
         return $form->schema([

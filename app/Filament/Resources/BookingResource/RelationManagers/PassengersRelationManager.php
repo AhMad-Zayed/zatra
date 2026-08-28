@@ -22,6 +22,16 @@ class PassengersRelationManager extends RelationManager
         return 'بيانات المسافرين ومستنداتهم';
     }
 
+    public static function getModelLabel(): string
+    {
+        return 'راكب';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الركاب';
+    }
+
     public function form(Form $form): Form
     {
         return $form

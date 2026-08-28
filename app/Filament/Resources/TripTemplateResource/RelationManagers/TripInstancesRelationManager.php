@@ -20,6 +20,16 @@ class TripInstancesRelationManager extends RelationManager
         return 'مواعيد الرحلات المجدولة';
     }
 
+    public static function getModelLabel(): string
+    {
+        return 'رحلة مجدولة';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الرحلات المجدولة';
+    }
+
     public function form(Form $form): Form
     {
         return $form

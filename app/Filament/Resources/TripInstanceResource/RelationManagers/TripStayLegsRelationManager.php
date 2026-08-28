@@ -27,6 +27,16 @@ class TripStayLegsRelationManager extends RelationManager
     protected static string $relationship = 'tripStayLegs';
     protected static ?string $title = 'مراحل الإقامة';
 
+    public static function getModelLabel(): string
+    {
+        return 'مرحلة إقامة';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'مراحل الإقامة';
+    }
+
     public function form(Form $form): Form
     {
         return $form

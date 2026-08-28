@@ -16,6 +16,16 @@ class WaitingListsRelationManager extends RelationManager
     // LABEL-009: Pure Arabic title
     protected static ?string $title = 'قائمة الانتظار';
 
+    public static function getModelLabel(): string
+    {
+        return 'طلب انتظار';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'طلبات الانتظار';
+    }
+
     public function form(Form $form): Form
     {
         return $form

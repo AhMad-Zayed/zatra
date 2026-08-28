@@ -24,6 +24,16 @@ class PackageOptionsRelationManager extends RelationManager
     protected static string $relationship = 'packageOptions';
     protected static ?string $title = 'باقات الإقامة';
 
+    public static function getModelLabel(): string
+    {
+        return 'باقة إقامة';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'باقات الإقامة';
+    }
+
     public function form(Form $form): Form
     {
         return $form->schema([

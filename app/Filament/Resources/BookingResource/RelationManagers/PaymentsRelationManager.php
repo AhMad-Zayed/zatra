@@ -13,8 +13,18 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class PaymentsRelationManager extends RelationManager
 {
     protected static string $relationship = 'payments';
-    
+
     protected static ?string $title = 'الدفعات المالية';
+
+    public static function getModelLabel(): string
+    {
+        return 'دفعة مالية';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return 'الدفعات المالية';
+    }
 
     public function form(Form $form): Form
     {
