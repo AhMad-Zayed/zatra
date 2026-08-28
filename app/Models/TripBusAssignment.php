@@ -95,6 +95,14 @@ class TripBusAssignment extends Model
                 throw new InvalidBusAssignmentException("يجب إدخال اسم ورقم هاتف {$roleLabel} الخارجي.");
             }
             $model->{"{$prefix}_staff_id"} = null;
+        } elseif ($type === null) {
+            // Not yet decided (Admin Panel UX audit, Friction Point #4): a bus can be attached to
+            // a trip before its driver/guide is rostered. Clear every field for this role so a
+            // half-filled internal/external pair from a previous edit never lingers once the
+            // type is reset to "unset".
+            $model->{"{$prefix}_staff_id"} = null;
+            $model->{"{$prefix}_name"} = null;
+            $model->{"{$prefix}_phone"} = null;
         } else {
             throw new InvalidBusAssignmentException("نوع {$roleLabel} غير صالح.");
         }
@@ -111,13 +119,11 @@ class TripBusAssignment extends Model
     {
         return [
             Forms\Components\Radio::make("{$prefix}_type")
-                ->label($roleLabel)
+                ->label($roleLabel . ' (اختياري - يمكن تحديده لاحقاً)')
                 ->options(AssignmentPersonTypeEnum::class)
-                ->default(AssignmentPersonTypeEnum::Internal->value)
                 ->inline()
                 ->inlineLabel(false)
-                ->live()
-                ->required(),
+                ->live(),
 
             Forms\Components\Select::make("{$prefix}_staff_id")
                 ->label('الموظف')
@@ -146,16 +152,20 @@ class TripBusAssignment extends Model
 
     public function getDriverDisplayNameAttribute(): string
     {
-        return $this->driver_type === AssignmentPersonTypeEnum::Internal
-            ? ($this->driverStaff?->name ?? '—')
-            : ($this->driver_name ?? '—');
+        return match ($this->driver_type) {
+            AssignmentPersonTypeEnum::Internal => $this->driverStaff?->name ?? '—',
+            AssignmentPersonTypeEnum::External => $this->driver_name ?? '—',
+            null => 'لم يُحدد بعد',
+        };
     }
 
     public function getGuideDisplayNameAttribute(): string
     {
-        return $this->guide_type === AssignmentPersonTypeEnum::Internal
-            ? ($this->guideStaff?->name ?? '—')
-            : ($this->guide_name ?? '—');
+        return match ($this->guide_type) {
+            AssignmentPersonTypeEnum::Internal => $this->guideStaff?->name ?? '—',
+            AssignmentPersonTypeEnum::External => $this->guide_name ?? '—',
+            null => 'لم يُحدد بعد',
+        };
     }
 
     public function tenant(): BelongsTo

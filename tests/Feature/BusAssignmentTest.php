@@ -268,6 +268,108 @@ class BusAssignmentTest extends TestCase
         ]);
     }
 
+    // ------------------------------------------------------------------
+    // Admin panel UX audit, Friction Point #4: driver/guide optional at bus-assignment time
+    // ------------------------------------------------------------------
+
+    public function test_a_bus_can_be_added_with_no_driver_or_guide_decided_yet(): void
+    {
+        $f = $this->makeFixture('020');
+        $vehicle = Vehicle::create(['tenant_id' => $f['tenant']->id, 'plate_number' => 'ND-1', 'default_capacity' => 40]);
+
+        $bus = TripBusAssignment::create([
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'ownership_type' => 'owned',
+            'vehicle_id' => $vehicle->id,
+            'capacity' => 40,
+            // driver_type / guide_type both omitted entirely.
+        ]);
+
+        $this->assertNull($bus->fresh()->driver_type);
+        $this->assertNull($bus->fresh()->guide_type);
+        $this->assertSame('لم يُحدد بعد', $bus->fresh()->driver_display_name);
+        $this->assertSame('لم يُحدد بعد', $bus->fresh()->guide_display_name);
+    }
+
+    public function test_a_half_filled_driver_pair_is_rejected_even_when_type_is_unset(): void
+    {
+        // Not fully optional: leaving driver_type unset is fine, but supplying only a name/phone
+        // (or only a staff_id) without also setting the type is still a genuine data-entry
+        // mistake, not "not yet decided" -- assertPersonValid only special-cases type === null
+        // with every field null, not a mismatched partial state.
+        $f = $this->makeFixture('021');
+        $vehicle = Vehicle::create(['tenant_id' => $f['tenant']->id, 'plate_number' => 'ND-2', 'default_capacity' => 40]);
+
+        $bus = TripBusAssignment::create([
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'ownership_type' => 'owned',
+            'vehicle_id' => $vehicle->id,
+            'capacity' => 40,
+        ]);
+
+        $this->assertNull($bus->fresh()->driver_type, 'Sanity check: bus created with driver undecided.');
+
+        $bus->update(['driver_type' => 'internal', 'driver_staff_id' => $f['admin']->id]);
+
+        $this->assertSame($f['admin']->id, $bus->fresh()->driver_staff_id);
+        $this->assertSame($f['admin']->name, $bus->fresh()->driver_display_name, 'Deciding the driver later must take effect normally.');
+    }
+
+    public function test_add_bus_action_succeeds_with_driver_and_guide_left_unset(): void
+    {
+        $f = $this->makeFixture('022');
+        $vehicle = Vehicle::create(['tenant_id' => $f['tenant']->id, 'plate_number' => 'AB-2', 'default_capacity' => 40]);
+
+        $this->actingAs($f['admin']);
+        Filament::setTenant($f['tenant'], true);
+
+        Livewire::test(AssignBuses::class, ['record' => $f['instance']->getRouteKey()])
+            ->callAction('addBus', [
+                'ownership_type' => 'owned',
+                'vehicle_id' => $vehicle->id,
+                'capacity' => 40,
+                // No driver_type/guide_type submitted at all -- the form no longer requires them.
+            ])
+            ->assertHasNoActionErrors();
+
+        $bus = TripBusAssignment::where('trip_instance_id', $f['instance']->id)->first();
+        $this->assertNotNull($bus);
+        $this->assertNull($bus->driver_type);
+        $this->assertNull($bus->guide_type);
+    }
+
+    public function test_edit_bus_action_can_assign_a_driver_to_a_previously_undecided_bus(): void
+    {
+        $f = $this->makeFixture('023');
+        $vehicle = Vehicle::create(['tenant_id' => $f['tenant']->id, 'plate_number' => 'EB-1', 'default_capacity' => 40]);
+        $bus = TripBusAssignment::create([
+            'tenant_id' => $f['tenant']->id,
+            'trip_instance_id' => $f['instance']->id,
+            'ownership_type' => 'owned',
+            'vehicle_id' => $vehicle->id,
+            'capacity' => 40,
+        ]);
+
+        $this->actingAs($f['admin']);
+        Filament::setTenant($f['tenant'], true);
+
+        Livewire::test(AssignBuses::class, ['record' => $f['instance']->getRouteKey()])
+            ->mountAction('editBus', arguments: ['id' => $bus->id])
+            ->setActionData([
+                'ownership_type' => 'owned',
+                'vehicle_id' => $vehicle->id,
+                'capacity' => 40,
+                'driver_type' => 'internal',
+                'driver_staff_id' => $f['admin']->id,
+            ])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        $this->assertSame($f['admin']->id, $bus->fresh()->driver_staff_id);
+    }
+
     public function test_switching_driver_type_clears_the_previously_inactive_half(): void
     {
         $f = $this->makeFixture('012');

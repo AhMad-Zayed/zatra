@@ -155,7 +155,7 @@
                                     <div class="text-xs text-gray-400">السائق</div>
                                     <div class="mt-0.5 flex items-center gap-1.5 font-medium text-gray-900 dark:text-white">
                                         {{ $bus->driver_display_name }}
-                                        @if ($bus->driver_type->value === 'external')
+                                        @if ($bus->driver_type?->value === 'external')
                                             <span class="text-xs font-normal text-gray-400">({{ $bus->driver_phone }})</span>
                                         @endif
                                     </div>
@@ -164,7 +164,7 @@
                                     <div class="text-xs text-gray-400">المرشد</div>
                                     <div class="mt-0.5 flex items-center gap-1.5 font-medium text-gray-900 dark:text-white">
                                         {{ $bus->guide_display_name }}
-                                        @if ($bus->guide_type->value === 'external')
+                                        @if ($bus->guide_type?->value === 'external')
                                             <span class="text-xs font-normal text-gray-400">({{ $bus->guide_phone }})</span>
                                         @endif
                                     </div>
