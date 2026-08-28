@@ -5,9 +5,13 @@ namespace App\Services;
 use App\Models\Customer;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use App\Exceptions\Auth\OtpCoolDownException;
 use App\Exceptions\Auth\InvalidOtpException;
+use App\Exceptions\Auth\OtpDeliveryException;
 use Exception;
 
 class CustomerOtpService
@@ -56,13 +60,104 @@ class CustomerOtpService
             'otp_expires_at' => now()->addMinutes(10),
         ]);
 
-        // Dispatch appropriate Notification
+        // Emergency hotfix: this used to only ever log the code, in every environment,
+        // including production -- no customer could ever actually receive a real OTP, so login
+        // silently appeared to work while being completely broken. Local/testing keeps the
+        // log-only behavior (no real WhatsApp Business/mail credentials are expected on a dev
+        // machine, and CustomerLogin's own "1234" bypass in local/testing doesn't depend on this
+        // anyway); production/staging now genuinely attempts delivery and fails loudly --
+        // throwing, not silently continuing -- if it can't, exactly like the earlier Browsershot
+        // fix this session for missing PDF-generation binaries.
         if (app()->environment('production', 'staging')) {
-            // TODO: Implement a proper SendCustomerNotificationJob for OTPs
-            // \App\Jobs\SendCustomerNotificationJob::dispatch($customer, $isEmail ? 'email' : 'whatsapp', "Your authentication code is {$otp}");
-            \Illuminate\Support\Facades\Log::info("Production OTP for {$field} {$cleanIdentifier}: {$otp}");
+            $this->deliver($isEmail, $cleanIdentifier, $otp);
         } else {
-            \Illuminate\Support\Facades\Log::info("Local/Testing OTP for {$field} {$cleanIdentifier}: {$otp}");
+            Log::info("Local/Testing OTP for {$field} {$cleanIdentifier}: {$otp}");
+        }
+    }
+
+    /**
+     * Actually attempt delivery of the OTP code, via whichever channel already exists and is
+     * integrated in this codebase for the identifier type -- email via the same Mail facade
+     * EmailNotificationDriver already uses, WhatsApp via the same Meta Graph API call and
+     * services.whatsapp config keys WhatsAppNotificationDriver already uses for booking
+     * notifications. Not routed through NotificationDriverInterface/NotificationManager: both
+     * existing drivers are typed to take a Booking (and WhatsAppNotificationDriver hardcodes the
+     * booking_confirmation_v1 template) -- neither fits a pre-booking login OTP, which needs its
+     * own approved WhatsApp template. Same provider and credentials, different message.
+     *
+     * @throws OtpDeliveryException
+     */
+    private function deliver(bool $isEmail, string $identifier, string $otp): void
+    {
+        if ($isEmail) {
+            $this->deliverByEmail($identifier, $otp);
+            return;
+        }
+
+        $this->deliverByWhatsApp($identifier, $otp);
+    }
+
+    private function deliverByEmail(string $email, string $otp): void
+    {
+        try {
+            Mail::to($email)->send(new \App\Mail\CustomerOtpMail($otp));
+        } catch (Exception $e) {
+            Log::error("OTP email delivery failed for {$email}: " . $e->getMessage());
+            throw new OtpDeliveryException("تعذر إرسال رمز التحقق عبر البريد الإلكتروني.", previous: $e);
+        }
+    }
+
+    private function deliverByWhatsApp(string $phone, string $otp): void
+    {
+        $token = config('services.whatsapp.token');
+        $phoneId = config('services.whatsapp.phone_id');
+        $template = config('services.whatsapp.otp_template');
+
+        if (!$token || !$phoneId) {
+            Log::error("OTP WhatsApp delivery failed for {$phone}: WHATSAPP_TOKEN/WHATSAPP_PHONE_ID is not configured on this server.");
+            throw new OtpDeliveryException('تعذر إرسال رمز التحقق عبر واتساب. يرجى المحاولة لاحقاً أو التواصل مع الدعم.');
+        }
+
+        $formattedPhone = preg_replace('/[^0-9]/', '', $phone);
+        $endpoint = "https://graph.facebook.com/v17.0/{$phoneId}/messages";
+
+        try {
+            $response = Http::withToken($token)
+                ->timeout(10)
+                ->retry(3, 1000)
+                ->post($endpoint, [
+                    'messaging_product' => 'whatsapp',
+                    'recipient_type' => 'individual',
+                    'to' => $formattedPhone,
+                    'type' => 'template',
+                    'template' => [
+                        // Must match a real, Meta-approved "Authentication" category template
+                        // on the tenant's WhatsApp Business account (services.whatsapp.otp_template
+                        // / WHATSAPP_OTP_TEMPLATE). The default value is a placeholder name, not
+                        // a template that exists in Meta's system yet -- this call will fail
+                        // (loudly, below) until the stakeholder creates and gets that template
+                        // approved and points this config at its real name.
+                        'name' => $template,
+                        'language' => ['code' => 'ar'],
+                        'components' => [
+                            [
+                                'type' => 'body',
+                                'parameters' => [
+                                    ['type' => 'text', 'text' => $otp],
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+        } catch (Exception $e) {
+            Log::error("OTP WhatsApp delivery failed for {$phone}: " . $e->getMessage());
+            throw new OtpDeliveryException('تعذر إرسال رمز التحقق عبر واتساب. يرجى المحاولة لاحقاً أو التواصل مع الدعم.', previous: $e);
+        }
+
+        if ($response->failed()) {
+            $errorMessage = $response->json('error.message', $response->body());
+            Log::error("OTP WhatsApp delivery failed for {$phone}: {$errorMessage}");
+            throw new OtpDeliveryException('تعذر إرسال رمز التحقق عبر واتساب. يرجى المحاولة لاحقاً أو التواصل مع الدعم.');
         }
     }
 

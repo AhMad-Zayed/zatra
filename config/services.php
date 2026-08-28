@@ -51,4 +51,13 @@ return [
         'npm_path'  => env('BROWSERSHOT_NPM_PATH'),
     ],
 
+    'whatsapp' => [
+        'token' => env('WHATSAPP_TOKEN'),
+        'phone_id' => env('WHATSAPP_PHONE_ID'),
+        // Meta requires every outbound WhatsApp Business template to be pre-approved by name --
+        // this must match a real, approved "Authentication" category template on the tenant's
+        // WhatsApp Business account before OTP delivery will actually work in production.
+        'otp_template' => env('WHATSAPP_OTP_TEMPLATE', 'otp_verification'),
+    ],
+
 ];
