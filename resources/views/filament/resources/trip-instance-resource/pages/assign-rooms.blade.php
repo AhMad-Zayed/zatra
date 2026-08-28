@@ -97,6 +97,10 @@
                         <div
                             data-sortable-zone
                             class="min-h-[120px] space-y-2 p-3"
+                            x-on:dragenter.prevent="$el.classList.add('ra-zone-active')"
+                            x-on:dragover.prevent
+                            x-on:dragleave="$el.classList.remove('ra-zone-active')"
+                            x-on:drop="$el.classList.remove('ra-zone-active')"
                         >
                             @forelse ($board['unassigned']->sortBy('booking_id') as $passenger)
                                 <div
@@ -142,9 +146,13 @@
                                         <div
                                             data-sortable-zone
                                             data-room-id="{{ $room->id }}"
-                                            class="min-h-[90px] space-y-2 p-3"
+                                            class="min-h-[90px] space-y-2 rounded-b-xl border-t-2 border-dashed border-gray-200 bg-gray-50/60 p-3 dark:border-white/10 dark:bg-white/[0.02]"
+                                            x-on:dragenter.prevent="$el.classList.add('ra-zone-active')"
+                                            x-on:dragover.prevent
+                                            x-on:dragleave="$el.classList.remove('ra-zone-active')"
+                                            x-on:drop="$el.classList.remove('ra-zone-active')"
                                         >
-                                            @foreach ($occupants as $assignment)
+                                            @forelse ($occupants as $assignment)
                                                 <div
                                                     wire:key="passenger-{{ $assignment->passenger->id }}"
                                                     data-passenger-id="{{ $assignment->passenger->id }}"
@@ -153,7 +161,9 @@
                                                     <div class="font-medium text-gray-900 dark:text-white">{{ $assignment->passenger->display_name }}</div>
                                                     <div class="mt-0.5 text-xs text-gray-400">{{ $assignment->passenger->booking?->pnr }}</div>
                                                 </div>
-                                            @endforeach
+                                            @empty
+                                                <p class="pointer-events-none py-4 text-center text-xs text-gray-400">اسحب راكباً هنا</p>
+                                            @endforelse
                                         </div>
                                     </div>
                                 @endforeach
@@ -168,5 +178,21 @@
     <style>
         .ra-ghost { opacity: 0.4; }
         .ra-drag { cursor: grabbing !important; }
+        {{-- Quick win: the drop zone (the card's content region below the header) was
+             indistinguishable from the rest of the card until a drop had already been attempted
+             on it -- a drag hovering the header/badge area silently did nothing, with no visual
+             cue either way. This highlights the exact region a drop will register on the moment
+             a drag enters it, matching the audit's suggested "or a visual highlight on hover"
+             remedy without moving data-sortable-zone onto the whole card (which would risk
+             SortableJS trying to sort the header's own children). --}}
+        [data-sortable-zone].ra-zone-active {
+            outline: 2px dashed rgb(37 99 235);
+            outline-offset: -2px;
+            background-color: rgb(239 246 255);
+        }
+        :root.dark [data-sortable-zone].ra-zone-active,
+        .dark [data-sortable-zone].ra-zone-active {
+            background-color: rgb(30 58 138 / 0.25);
+        }
     </style>
 </x-filament-panels::page>

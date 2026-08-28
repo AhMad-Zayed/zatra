@@ -100,14 +100,15 @@ class AdminPanelProvider extends PanelProvider
                 \Filament\Navigation\NavigationGroup::make('التقارير')->collapsible(false),
                 \Filament\Navigation\NavigationGroup::make('الإعدادات')->collapsible(false),
             ])
+            // Admin panel UX audit, quick win: discoverWidgets() already registers every widget
+            // in this directory, ordered by each widget's own $sort (0-4, already set up on all
+            // six classes below). The explicit ->widgets([...]) array that used to sit here
+            // re-registered 4 of those same 6 classes a second time -- Filament rendered
+            // QuickActionsWidget (and its "العملاء" tile), DashboardStatsOverview,
+            // StaffOverviewWidget, and TodaysDeparturesWidget twice on every dashboard load,
+            // while AutomationStatusWidget and RevenueChart (never in that list) rendered once.
+            // Discovery alone now registers all six, exactly once each, in their intended order.
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                \App\Filament\Widgets\QuickActionsWidget::class,
-                \App\Filament\Widgets\DashboardStatsOverview::class,
-                // BookingStatsWidget was merged into DashboardStatsOverview (CRIT-001 fix)
-                \App\Filament\Widgets\StaffOverviewWidget::class, // role-gated replacement for the retired StaffDashboard page
-                \App\Filament\Widgets\TodaysDeparturesWidget::class, // HIGH-006
-            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

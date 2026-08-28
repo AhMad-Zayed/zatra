@@ -607,6 +607,14 @@ class BookingResource extends Resource
                     ->label('حالة الحجز')
                     ->badge()
                     ->sortable(),
+                // Admin panel UX audit, quick win: the dashboard already surfaces a "pending
+                // cancellation requests" count, but nothing on the booking list itself flagged
+                // WHICH row it referred to without opening each one to check.
+                Tables\Columns\IconColumn::make('cancellation_requested_at')
+                    ->label('طلب إلغاء')
+                    ->icon(fn (?string $state): ?string => $state ? 'heroicon-o-exclamation-circle' : null)
+                    ->color('danger')
+                    ->tooltip(fn (?string $state): ?string => $state ? 'طلب إلغاء معلّق من العميل' : null),
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('حالة الدفع')
                     ->badge()

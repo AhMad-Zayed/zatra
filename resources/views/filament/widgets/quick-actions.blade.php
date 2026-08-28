@@ -1,4 +1,11 @@
 <x-filament-widgets::widget>
+    @if ($this->isFreshTenant())
+        <div class="mb-4 flex items-center gap-3 rounded-lg border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800 dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-300">
+            <x-heroicon-o-sparkles class="h-5 w-5 shrink-0" />
+            <span>مرحباً بك! ابدأ بإنشاء أول رحلة لك لتظهر بيانات لوحة التحكم — استخدم بطاقة "رحلة جديدة" أدناه.</span>
+        </div>
+    @endif
+
     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
 
         {{-- New Booking — the one accent-colored tile per spec ("used sparingly") --}}

@@ -70,6 +70,10 @@
                         <div
                             data-sortable-zone
                             class="min-h-[120px] space-y-2 p-3"
+                            x-on:dragenter.prevent="$el.classList.add('ba-zone-active')"
+                            x-on:dragover.prevent
+                            x-on:dragleave="$el.classList.remove('ba-zone-active')"
+                            x-on:drop="$el.classList.remove('ba-zone-active')"
                         >
                             @forelse ($board['unassigned']->sortBy('booking_id') as $passenger)
                                 <div
@@ -174,9 +178,13 @@
                             <div
                                 data-sortable-zone
                                 data-bus-id="{{ $bus->id }}"
-                                class="min-h-[90px] space-y-2 border-t border-gray-100 p-3 dark:border-white/10"
+                                class="min-h-[90px] space-y-2 rounded-b-xl border-t-2 border-dashed border-gray-200 bg-gray-50/60 p-3 dark:border-white/10 dark:bg-white/[0.02]"
+                                x-on:dragenter.prevent="$el.classList.add('ba-zone-active')"
+                                x-on:dragover.prevent
+                                x-on:dragleave="$el.classList.remove('ba-zone-active')"
+                                x-on:drop="$el.classList.remove('ba-zone-active')"
                             >
-                                @foreach ($occupants->sortBy(fn ($p) => (int) $p->seat_number) as $passenger)
+                                @forelse ($occupants->sortBy(fn ($p) => (int) $p->seat_number) as $passenger)
                                     <div
                                         wire:key="passenger-{{ $passenger->id }}"
                                         data-passenger-id="{{ $passenger->id }}"
@@ -190,7 +198,9 @@
                                             مقعد {{ $passenger->seat_number }}
                                         </span>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <p class="pointer-events-none py-4 text-center text-xs text-gray-400">اسحب راكباً هنا</p>
+                                @endforelse
                             </div>
                         </div>
                     @endforeach
@@ -202,5 +212,19 @@
     <style>
         .ba-ghost { opacity: 0.4; }
         .ba-drag { cursor: grabbing !important; }
+        {{-- Quick win: the drop zone (the card's content region below the driver/guide header)
+             was indistinguishable from the rest of the card until a drop had already been
+             attempted on it -- a drag hovering the header area silently did nothing, with no
+             visual cue either way. This highlights the exact region a drop will register on the
+             moment a drag enters it. --}}
+        [data-sortable-zone].ba-zone-active {
+            outline: 2px dashed rgb(37 99 235);
+            outline-offset: -2px;
+            background-color: rgb(239 246 255);
+        }
+        :root.dark [data-sortable-zone].ba-zone-active,
+        .dark [data-sortable-zone].ba-zone-active {
+            background-color: rgb(30 58 138 / 0.25);
+        }
     </style>
 </x-filament-panels::page>
