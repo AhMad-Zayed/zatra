@@ -1,6 +1,6 @@
 <div class="max-w-6xl mx-auto py-12 px-4 sm:px-6 lg:px-8" dir="rtl">
     <!-- Hero Banner -->
-    <div class="mb-10 bg-gradient-to-r from-zatara-blue to-zatara-blue/80 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden">
+    <div class="mb-10 bg-gradient-to-r from-zatara-blue to-zatara-blue/80 rounded-3xl p-8 text-white relative overflow-hidden">
         <div class="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
         <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-zatara-gold/20 rounded-full blur-2xl"></div>
         <div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -8,7 +8,7 @@
                 <h1 class="text-4xl font-extrabold tracking-tight mb-2">أهلاً بك، {{ auth('customer')->user()->name ?? 'ضيفنا العزيز' }}</h1>
                 <p class="text-lg text-white/80">إدارة ومتابعة رحلاتك الفاخرة بكل سهولة.</p>
             </div>
-            <div class="bg-white/10 backdrop-blur-md rounded-2xl p-4 text-center min-w-[150px] border border-white/20">
+            <div class="bg-white/10 rounded-2xl p-4 text-center min-w-[150px] border border-white/20">
                 <span class="block text-sm text-white/70 mb-1">عدد رحلاتك</span>
                 <span class="block text-3xl font-black text-zatara-gold">{{ $bookings->count() }}</span>
             </div>
@@ -28,7 +28,7 @@
     
     <div class="grid grid-cols-1 gap-8">
         @forelse($bookings as $booking)
-            <div class="bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition duration-300 relative group">
+            <div class="bg-white rounded-3xl border border-gray-100 overflow-hidden transition-colors duration-300 hover:border-zatara-blue/20 relative group">
                 <!-- Status Badge Ribbon -->
                 <div class="absolute top-6 left-6 z-10">
                     @php
@@ -137,8 +137,8 @@
                             @endif
 
                             @if($booking->balance_due <= 0 && $booking->hasMedia('tickets'))
-                                <a href="{{ route('storefront.ticket.download', ['tenant' => $tenant->slug, 'booking' => $booking->id]) }}" 
-                                   class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-bold rounded-xl text-white bg-zatara-blue hover:bg-zatara-blue/90 shadow-lg shadow-zatara-blue/20 transition transform hover:-translate-y-0.5">
+                                <a href="{{ route('storefront.ticket.download', ['tenant' => $tenant->slug, 'booking' => $booking->id]) }}"
+                                   class="inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-bold rounded-xl text-white bg-zatara-blue hover:bg-zatara-blue/90 transition">
                                     <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                                     تنزيل التذكرة
                                 </a>
