@@ -39,15 +39,23 @@ class BulkGenerateTripInstances implements ShouldQueue
 
     /**
      * Execute the job.
+     *
+     * Returns the created instances (widened from the original void return type) so a synchronous
+     * caller (dispatchSync(), used by TripInstanceResource's ported recurring-schedule create
+     * flow) can redirect to one of them — a purely additive change, since nothing previously read
+     * this job's return value while it was only ever async-dispatched.
+     *
+     * @return \Illuminate\Support\Collection<int, TripInstance>
      */
-    public function handle(): void
+    public function handle(): \Illuminate\Support\Collection
     {
         $template = TripTemplate::with(['templatePassengerCategories', 'templateAddons'])->find($this->templateId);
-        if (!$template) return;
+        if (!$template) return collect();
 
         $user = User::find($this->userId);
         $chunks = array_chunk($this->dates, 100);
         $totalCreated = 0;
+        $createdInstances = collect();
 
         foreach ($chunks as $chunk) {
             foreach ($chunk as $dateString) {
@@ -63,8 +71,16 @@ class BulkGenerateTripInstances implements ShouldQueue
                 ]);
 
                 // Create Tiers
+                // tenant_id set explicitly, not left to TripPassengerCategory's own
+                // Filament::getTenant()-fallback creating() hook -- that hook only resolves inside
+                // an actual Filament panel request; this job (ShouldQueue) can run from a real
+                // queue worker with no such context, which would otherwise crash on the
+                // NOT NULL tenant_id column exactly the way it did when first tested outside an
+                // active panel session. $instance->tenant_id (set explicitly two lines above) is
+                // always reliable regardless of how/where this job runs.
                 foreach ($template->templatePassengerCategories as $tier) {
                     $instance->tripPassengerCategories()->create([
+                        'tenant_id' => $instance->tenant_id,
                         'name' => $tier->name,
                         'price' => $tier->price,
                         'requires_seat' => $tier->requires_seat,
@@ -74,6 +90,7 @@ class BulkGenerateTripInstances implements ShouldQueue
                 // Create Addons
                 foreach ($template->templateAddons as $addon) {
                     $instance->tripAddons()->create([
+                        'tenant_id' => $instance->tenant_id,
                         'name' => $addon->name,
                         'price' => $addon->price,
                         'max_quantity' => $addon->max_quantity,
@@ -85,6 +102,7 @@ class BulkGenerateTripInstances implements ShouldQueue
                     $instance->pickupRoutes()->attach($this->pickupRouteIds);
                 }
 
+                $createdInstances->push($instance);
                 $totalCreated++;
             }
         }
@@ -96,5 +114,7 @@ class BulkGenerateTripInstances implements ShouldQueue
                 ->success()
                 ->sendToDatabase($user);
         }
+
+        return $createdInstances;
     }
 }

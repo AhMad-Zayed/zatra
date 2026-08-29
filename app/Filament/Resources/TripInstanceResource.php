@@ -34,7 +34,6 @@ class TripInstanceResource extends Resource
         return 'الرحلات المجدولة';
     }
 
-    // Navigation group — matches TripBuilderResource
     protected static ?string $navigationGroup = 'الرحلات والفنادق';
     protected static ?int $navigationSort = 1;
 
@@ -53,6 +52,26 @@ class TripInstanceResource extends Resource
     {
         return $form
             ->schema([
+                // Ported from the retired TripBuilderResource (deleted — unmaintained, and its
+                // own wizard never collected trip_type, silently leaving it NULL): the one
+                // capability that flow had and this one didn't is generating several instances
+                // across a recurring date range in one submission. Offered here as an additional
+                // choice alongside the existing single-instance create, not a replacement for it
+                // — invisible on edit (visibleOn('create')), so a null schedule_type there simply
+                // falls through every condition below as "not recurring", i.e. today's edit
+                // behavior is completely unchanged.
+                Forms\Components\Radio::make('schedule_type')
+                    ->label('نوع الجدولة')
+                    ->options([
+                        'single' => 'موعد واحد',
+                        'recurring' => 'جدولة متكررة (عدة تواريخ دفعة واحدة)',
+                    ])
+                    ->default('single')
+                    ->inline()
+                    ->live()
+                    ->required()
+                    ->visibleOn('create'),
+
                 Forms\Components\Section::make('المعلومات الأساسية')
                     ->schema([
                         Forms\Components\Select::make('trip_template_id')
@@ -100,15 +119,18 @@ class TripInstanceResource extends Resource
                             ->helperText('ترث العملة من القالب، ولا يمكن تغييرها لاحقاً إذا كان هناك حجوزات.'),
                         Forms\Components\DatePicker::make('start_date')
                             ->label('تاريخ الذهاب')
-                            ->required(),
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
+                            ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring'),
                         Forms\Components\DatePicker::make('end_date')
                             ->label('تاريخ الإياب')
-                            ->required()
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
+                            ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
                             ->afterOrEqual('start_date'),
                         Forms\Components\TextInput::make('available_seats')
                             ->label('المقاعد المتاحة')
                             ->numeric()
-                            ->required()
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
+                            ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
                             // Bus/Fleet redesign Ticket 2: once a trip has bus assignments,
                             // available_seats is a managed value (kept in sync with the sum of
                             // those assignments' capacity by TripFleetService) — hand-editing it
@@ -132,6 +154,7 @@ class TripInstanceResource extends Resource
                     
                 Forms\Components\Section::make('التسعير الخاص والوسائط')
                     ->description('تعديل السعر أو إضافة صورة غلاف خاصة بهذا الموعد فقط (اختياري)')
+                    ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
                     ->schema([
                         Forms\Components\Toggle::make('price_override')
                             ->label('تغيير السعر الأساسي لهذا الموعد؟')
@@ -155,9 +178,22 @@ class TripInstanceResource extends Resource
 
                 Forms\Components\Section::make('فئات التسعير الخاصة بهذا الموعد')
                     ->description('تم نسخ هذه الفئات من القالب تلقائياً، يمكنك تعديل أسعارها لهذا الموعد خصيصاً (مثال: أسعار العطلات).')
+                    ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
                     ->schema([
                         Forms\Components\Repeater::make('tripPassengerCategories')
                             ->relationship('tripPassengerCategories')
+                            // Every instance a recurring batch generates gets an identical,
+                            // unmodified copy of the template's categories (same as
+                            // BulkGenerateTripInstances always did) -- per-instance price
+                            // overrides don't make sense across a whole batch at once. ->hidden(),
+                            // not just the wrapping Section's ->visible(), so Filament's own
+                            // saveRelationships() (BelongsToModel::saveRelationships(), which
+                            // skips hidden relationship fields unless
+                            // saveRelationshipsWhenHidden() is set) never attempts to sync this
+                            // repeater's empty recurring-mode state onto whichever instance ends
+                            // up as $this->record -- that would wipe the categories the bulk job
+                            // itself just created.
+                            ->hidden(fn (Forms\Get $get) => $get('schedule_type') === 'recurring')
                             ->minItems(1)
                             ->label('الفئات')
                             ->schema([
@@ -181,9 +217,11 @@ class TripInstanceResource extends Resource
 
                 Forms\Components\Section::make('الإضافات والمخزون الخاص بهذا الموعد')
                     ->description('تم نسخ الإضافات من القالب، قم بتحديد السعة القصوى المتاحة لهذا الموعد لتجنب الحجوزات الزائدة.')
+                    ->visible(fn (Forms\Get $get) => $get('schedule_type') !== 'recurring')
                     ->schema([
                         Forms\Components\Repeater::make('tripAddons')
                             ->relationship()
+                            ->hidden(fn (Forms\Get $get) => $get('schedule_type') === 'recurring')
                             ->label('الإضافات')
                             ->schema([
                                 Forms\Components\TextInput::make('name')
@@ -203,6 +241,44 @@ class TripInstanceResource extends Resource
                             ->columns(3)
                             ->addActionLabel('إضافة خدمة استثنائية'),
                     ]),
+
+                Forms\Components\Section::make('جدولة متكررة (توليد عدة مواعيد دفعة واحدة)')
+                    ->description('سيتم إنشاء موعد منفصل لكل تاريخ مطابق ضمن النطاق، بنفس فئات التسعير والإضافات المنسوخة من القالب — دون تخصيص سعر أو صورة خاصة لكل موعد.')
+                    ->visible(fn (Forms\Get $get) => $get('schedule_type') === 'recurring')
+                    ->schema([
+                        Forms\Components\TextInput::make('recurring_seats_count')
+                            ->label('عدد المقاعد لكل موعد')
+                            ->numeric()
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') === 'recurring'),
+                        Forms\Components\DatePicker::make('recurring_start')
+                            ->label('من تاريخ')
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') === 'recurring'),
+                        Forms\Components\DatePicker::make('recurring_end')
+                            ->label('إلى تاريخ')
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') === 'recurring')
+                            ->afterOrEqual('recurring_start'),
+                        Forms\Components\CheckboxList::make('recurring_days')
+                            ->label('أيام التكرار')
+                            ->options([
+                                1 => 'الاثنين',
+                                2 => 'الثلاثاء',
+                                3 => 'الأربعاء',
+                                4 => 'الخميس',
+                                5 => 'الجمعة',
+                                6 => 'السبت',
+                                0 => 'الأحد',
+                            ])
+                            ->required(fn (Forms\Get $get) => $get('schedule_type') === 'recurring')
+                            ->columns(4)
+                            ->columnSpanFull(),
+                        Forms\Components\Select::make('recurring_pickup_routes')
+                            ->label('مسارات التجمع (اختياري)')
+                            ->multiple()
+                            ->options(fn () => \App\Models\PickupRoute::where('tenant_id', \Filament\Facades\Filament::getTenant()?->id)->pluck('name', 'id'))
+                            ->searchable()
+                            ->preload()
+                            ->columnSpanFull(),
+                    ])->columns(2),
             ]);
     }
 
