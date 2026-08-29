@@ -31,8 +31,18 @@ class BookingSuccess extends Component
     public function downloadPdf()
     {
         $booking = $this->booking;
+        // pdf.ticket-template actually references $tenant, $qrCode, $trip (not $tripInstance),
+        // and $passengers -- confirmed against TicketGenerationService::generateAndStoreTicket(),
+        // the template's other real caller, which already passes exactly this set correctly.
+        // This method previously passed only 'booking' and 'tripInstance' (a name the template
+        // never uses at all), so every one of $tenant/$qrCode/$trip/$passengers rendered as an
+        // undefined variable -- $tenant specifically threw first, live-reproduced and reported
+        // via a customer download attempt, but every other one was equally broken and would have
+        // failed the same way immediately after.
+        $tenant = $this->tenant;
+        $qrCode = $this->qrCodeSvg;
 
-        return response()->streamDownload(function () use ($booking) {
+        return response()->streamDownload(function () use ($booking, $tenant, $qrCode) {
             echo pdf()
                 ->withBrowsershot(function (Browsershot $browsershot) {
                     if (config('services.browsershot.node_path')) {
@@ -42,7 +52,13 @@ class BookingSuccess extends Component
                         $browsershot->setNpmBinary(config('services.browsershot.npm_path'));
                     }
                 })
-                ->view('pdf.ticket-template', ['booking' => $booking, 'tripInstance' => $booking->tripInstance])
+                ->view('pdf.ticket-template', [
+                    'booking' => $booking,
+                    'tenant' => $tenant,
+                    'qrCode' => $qrCode,
+                    'trip' => $booking->tripInstance,
+                    'passengers' => $booking->passengers,
+                ])
                 ->name('Zatara-Ticket-' . $booking->pnr . '.pdf')
                 ->format('a4')
                 ->generatePdfContent();

@@ -77,7 +77,7 @@
                 <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
                     <p class="text-xs text-blue-600 font-bold uppercase tracking-widest mb-1">الانطلاق (Departure)</p>
                     <p class="text-xl font-bold text-gray-900">{{ $trip->start_date?->format('d M Y') ?? 'N/A' }}</p>
-                    <p class="text-sm text-gray-600 mt-1">{{ $trip->template->origin ?? 'المحطة الرئيسية' }}</p>
+                    <p class="text-sm text-gray-600 mt-1">{{ $trip->tripTemplate->origin ?? 'المحطة الرئيسية' }}</p>
                 </div>
                 
                 <div class="flex flex-col justify-center items-center text-gray-300">
@@ -90,18 +90,23 @@
                 <div class="bg-green-50/50 p-4 rounded-lg border border-green-100">
                     <p class="text-xs text-green-600 font-bold uppercase tracking-widest mb-1">الوصول (Arrival)</p>
                     <p class="text-xl font-bold text-gray-900">{{ $trip->end_date?->format('d M Y') ?? 'N/A' }}</p>
-                    <p class="text-sm text-gray-600 mt-1">{{ $trip->template->destination ?? 'الوجهة السياحية' }}</p>
+                    <p class="text-sm text-gray-600 mt-1">{{ $trip->tripTemplate->destination ?? 'الوجهة السياحية' }}</p>
                 </div>
             </div>
 
             <!-- Addons -->
-            @if($booking->addons && $booking->addons->count() > 0)
+            {{-- Booking has no addons() relation at all (only bookingAddons(), which links to
+                 TripAddon via tripAddon() -- there's no addon_name column anywhere either).
+                 $booking->addons resolved to null via Eloquent's magic __get for an undefined
+                 relation/attribute, so this never crashed, but purchased add-ons never actually
+                 appeared on a single generated ticket either. --}}
+            @if($booking->bookingAddons && $booking->bookingAddons->count() > 0)
             <div class="mb-8">
                 <p class="text-sm font-bold text-gray-700 mb-2">الإضافات المشتراة (Purchased Add-ons):</p>
                 <div class="flex flex-wrap gap-2">
-                    @foreach($booking->addons as $addon)
+                    @foreach($booking->bookingAddons as $bookingAddon)
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            {{ $addon->addon_name ?? 'إضافة' }}
+                            {{ $bookingAddon->tripAddon->name ?? 'إضافة' }}
                         </span>
                     @endforeach
                 </div>
