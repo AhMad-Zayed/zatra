@@ -39,7 +39,18 @@ class BookingForm extends Form
             'passengers.*.document_number' => ['nullable', 'string'],
             'passengers.*.date_of_birth' => ['nullable', 'date', 'before:today'],
             'passengers.*.trip_passenger_category_id' => [
-                'nullable',
+                // Was 'nullable' -- the passenger-category-required error message below
+                // ('trip_passenger_category_id.required') already existed, confirming this was
+                // always meant to be required and never actually was. A passenger with no
+                // category selected passed this validation with a null value, which
+                // CreateBookingService::execute() then fed straight into
+                // TripPassengerCategory::where('id', null)->firstOrFail() -- ModelNotFoundException,
+                // caught by CheckoutWizard's generic catch-all and shown as a raw English
+                // "Something went wrong" error instead of a real, actionable validation message.
+                // Live-reproduced: submitting with a passenger's category left unselected (the
+                // dropdown's default "اختر النوع..." placeholder option has an empty value)
+                // crashed at the final "تأكيد الحجز الآن" click with exactly this error.
+                'required',
                 'integer',
                 Rule::exists('trip_passenger_categories', 'id')->where(function ($query) {
                     return $query->where('trip_instance_id', $this->trip_instance_id);

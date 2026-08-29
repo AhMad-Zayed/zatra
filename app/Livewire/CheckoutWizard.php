@@ -653,8 +653,15 @@ class CheckoutWizard extends Component
             $this->form->addError('passengers', $e->getMessage());
             $this->currentStep = 2; // Send them back to passenger step
         } catch (\Exception $e) {
-            // Catch-all to prevent 500 crashes
-            $this->form->addError('passengers', 'Something went wrong while processing your booking. Please try again later.');
+            // Catch-all to prevent 500 crashes. Defense-in-depth only: the specific,
+            // live-reproduced cause of this firing (a passenger submitted with no category
+            // selected -- 'trip_passenger_category_id' was 'nullable' instead of 'required' in
+            // BookingForm::rules(), so CreateBookingService::execute()'s
+            // TripPassengerCategory::where('id', null)->firstOrFail() threw a
+            // ModelNotFoundException) is now actually prevented upstream by that validation fix,
+            // not just hidden behind a nicer message here. This still shows a real, actionable
+            // Arabic message rather than raw English for whatever else might reach this catch.
+            $this->form->addError('passengers', 'حدث خطأ أثناء معالجة حجزك، يرجى المحاولة مرة أخرى.');
             // Log the exception in production
             \Illuminate\Support\Facades\Log::error('Checkout Error: ' . $e->getMessage());
         }
