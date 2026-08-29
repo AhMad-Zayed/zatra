@@ -1,4 +1,8 @@
-<div x-data="{ showGallery: false }">
+<div x-data="{
+    showGallery: false,
+    travelerCount: 1,
+    maxTravelers: {{ $selectedInstance && $selectedInstance->remaining_seats > 0 ? min($selectedInstance->remaining_seats, 10) : 10 }},
+}">
     {{-- ========================== 
          ZATARA GLOBAL UI (2026) - TRIP DETAILS
          Aesthetic: Aerodynamic Clarity, Glassmorphism
@@ -169,6 +173,42 @@
             
             {{-- MAIN CONTENT (Left Side) --}}
             <div class="flex-1">
+                {{-- Quick Info Bar -- matches the Stitch mockup's fact strip
+                     (stich_with_google_store/stitch_admin_panel_arabic_rebranding (4)), but only
+                     the two facts this app actually has real data for: duration (computed from
+                     the selected instance's own dates, not a nonexistent template-level field)
+                     and trip type (an existing, already-populated enum). The mockup also shows a
+                     "departure city" and "hotel level" fact -- there's no real field backing
+                     either one on TripTemplate/TripInstance (PickupRoute/PickupPoint model local
+                     transport pickup points, not a trip-level origin city; hotel star level is
+                     package-specific, not a single trip-wide fact), so neither is faked here. --}}
+                @if($selectedInstance || $template->trip_type)
+                    <div class="flex flex-wrap gap-6 bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-10">
+                        @if($selectedInstance)
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-zatara-blue text-2xl">schedule</span>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">المدة</p>
+                                    <p class="font-bold text-zatara-blue">
+                                        {{ $selectedInstance->start_date->diffInDays($selectedInstance->end_date) + 1 }} أيام
+                                        / {{ $selectedInstance->start_date->diffInDays($selectedInstance->end_date) }} ليالٍ
+                                    </p>
+                                </div>
+                            </div>
+                        @endif
+                        @if($template->trip_type)
+                            <div class="hidden sm:block w-px bg-slate-200"></div>
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-zatara-blue text-2xl">public</span>
+                                <div>
+                                    <p class="text-xs text-slate-400 font-medium">نوع الرحلة</p>
+                                    <p class="font-bold text-zatara-blue">{{ $template->trip_type->getLabel() }}</p>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 {{-- About the Trip --}}
                 <div class="mb-12">
                     <h2 class="text-2xl font-bold text-zatara-blue mb-4">عن الرحلة</h2>
@@ -216,14 +256,23 @@
                     <h2 class="text-2xl font-bold text-zatara-blue mb-8">مسار الرحلة الممتع</h2>
                     
                     @if($template->itinerary_data && is_array($template->itinerary_data) && count($template->itinerary_data) > 0)
-                        <div class="relative border-r-2 border-zatara-blue/10 pr-8 space-y-12">
+                        {{-- Each day wrapped in its own bordered card (matching the Stitch
+                             mockup's per-day cards) rather than bare text against the timeline
+                             line -- the line/dot alone read as noticeably sparser than the
+                             mockup's actual density. First day's dot in the gold accent color
+                             (matches the mockup's day-1 accent), the rest in Sapphire Blue. --}}
+                        <div class="relative border-r-2 border-zatara-blue/10 pr-8 space-y-6">
                             @foreach($template->itinerary_data as $index => $day)
                                 <div class="relative">
-                                    <div class="absolute -right-11 w-6 h-6 rounded-full bg-zatara-blue border-4 border-white flex items-center justify-center shadow-md"></div>
-                                    <h3 class="text-xl font-bold text-zatara-blue mb-2">{{ $day['title'] ?? 'اليوم ' . ($index + 1) }}</h3>
-                                    <p class="text-slate-500 font-light leading-relaxed">
-                                        {{ $day['description'] ?? '' }}
-                                    </p>
+                                    <div class="absolute -right-11 w-6 h-6 rounded-full {{ $index === 0 ? 'bg-zatara-gold' : 'bg-zatara-blue' }} border-4 border-white flex items-center justify-center shadow-md text-white text-xs font-bold">
+                                        {{ $index + 1 }}
+                                    </div>
+                                    <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                                        <h3 class="text-lg font-bold text-zatara-blue mb-2">{{ $day['title'] ?? 'اليوم ' . ($index + 1) }}</h3>
+                                        <p class="text-slate-500 font-light leading-relaxed">
+                                            {{ $day['description'] ?? '' }}
+                                        </p>
+                                    </div>
                                 </div>
                             @endforeach
                         </div>
@@ -233,38 +282,87 @@
                         </div>
                     @endif
                 </div>
+
+                {{-- Includes / Excludes -- new fields (migration
+                     2026_09_07_000001_add_includes_excludes_to_trip_templates), matching the
+                     Stitch mockup's "يشمل / لا يشمل" two-column section. Hidden entirely (not
+                     shown with a placeholder/empty state) until an agency admin actually fills
+                     these in via TripTemplateResource -- no fake content. --}}
+                @if(!empty($template->includes) || !empty($template->excludes))
+                    <div class="mb-12 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        @if(!empty($template->excludes))
+                            <div class="bg-white border border-slate-100 rounded-2xl p-6">
+                                <h3 class="flex items-center gap-2 text-lg font-bold text-zatara-red mb-4">
+                                    <span class="material-symbols-outlined">cancel</span>
+                                    لا يشمل
+                                </h3>
+                                <ul class="space-y-2">
+                                    @foreach($template->excludes as $item)
+                                        <li class="text-slate-600 text-sm flex items-start gap-2">
+                                            <span class="text-slate-300 mt-1">•</span>
+                                            <span>{{ $item }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                        @if(!empty($template->includes))
+                            <div class="bg-white border border-slate-100 rounded-2xl p-6">
+                                <h3 class="flex items-center gap-2 text-lg font-bold text-zatara-success mb-4">
+                                    <span class="material-symbols-outlined">check_circle</span>
+                                    يشمل
+                                </h3>
+                                <ul class="space-y-2">
+                                    @foreach($template->includes as $item)
+                                        <li class="text-slate-600 text-sm flex items-start gap-2">
+                                            <span class="text-slate-300 mt-1">•</span>
+                                            <span>{{ $item }}</span>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    </div>
+                @endif
             </div>
 
             {{-- STICKY BOOKING WIDGET (Right Side) --}}
             <div class="w-full lg:w-96 shrink-0 relative">
-                <div class="sticky top-32 glass-panel rounded-3xl p-6 shadow-2xl shadow-zatara-blue/5">
-                    
+                <div class="sticky top-32 bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-2xl shadow-zatara-blue/5">
+
                     @if($instances->isEmpty())
-                        <div class="text-center py-8">
+                        <div class="text-center py-8 px-6">
                             <span class="material-symbols-outlined text-5xl text-slate-300 mb-4">event_busy</span>
                             <h3 class="text-xl font-bold text-zatara-blue mb-2">لا توجد رحلات قادمة</h3>
                             <p class="text-slate-500 text-sm mb-6">سنقوم بتحديث المواعيد قريباً.</p>
                             <button class="btn-secondary w-full py-3">أعلمني عند توفر مقاعد</button>
                         </div>
                     @else
-                        <div class="text-center mb-6 border-b border-slate-100 pb-6">
-                            <p class="text-sm text-slate-400 mb-1">احجز مقعدك الآن</p>
-                            <div class="text-4xl font-black text-zatara-blue">
-                                @if($hasVariablePricing && $selectedInstance)
-                                    {{ number_format($selectedInstance->price_override ? $selectedInstance->price_override_amount : ($template->starting_price)) }}
-                                @else
-                                    {{ number_format($template->starting_price) }}
-                                @endif
-                                <span class="text-lg font-medium text-slate-500">{{ $template->currency ?? 'USD' }}</span>
+                        {{-- Solid Sapphire Blue price header, matching the mockup's bg-primary
+                             block (stich_with_google_store/stitch_admin_panel_arabic_rebranding
+                             (4)) -- previously a plain glass-panel treatment shared with the rest
+                             of the card. --}}
+                        <div class="bg-zatara-blue text-white p-6">
+                            <p class="text-sm text-white/70 mb-1">يبدأ من</p>
+                            <div class="flex items-baseline gap-2 flex-wrap">
+                                <span class="text-4xl font-black">
+                                    @if($hasVariablePricing && $selectedInstance)
+                                        {{ number_format($selectedInstance->price_override ? $selectedInstance->price_override_amount : ($template->starting_price)) }}
+                                    @else
+                                        {{ number_format($template->starting_price) }}
+                                    @endif
+                                </span>
+                                <span class="text-sm font-medium text-white/80">{{ $template->currency ?? 'USD' }} / للشخص</span>
                             </div>
                             @if($selectedInstance && $selectedInstance->remaining_seats <= 10 && $selectedInstance->remaining_seats > 0)
-                                <p class="text-xs text-zatara-red font-medium mt-2 bg-zatara-red/10 py-1 px-3 rounded-full inline-block">
+                                <p class="text-xs font-medium mt-3 bg-white/15 py-1 px-3 rounded-full inline-block">
                                     <span class="material-symbols-outlined text-[14px] align-middle">local_fire_department</span>
                                     متبقي {{ $selectedInstance->remaining_seats }} مقاعد فقط!
                                 </p>
                             @endif
                         </div>
 
+                        <div class="p-6">
                         <div class="space-y-4 mb-6">
                             {{-- Date Selector --}}
                             @if($instances->count() == 1)
@@ -291,13 +389,31 @@
                                 </div>
                             @endif
                             
-                            {{-- Guests Selector --}}
-                            <div class="bg-white border border-slate-200 rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-zatara-blue transition-colors">
-                                <div>
-                                    <p class="text-xs text-slate-400 font-medium">المسافرين</p>
-                                    <p class="font-bold text-zatara-blue">1 بالغ</p>
+                            {{-- Traveler Count Stepper -- was pure decoration: styled to look
+                                 clickable (cursor-pointer, hover border) but had no @click/wire:click
+                                 handler at all, so nothing happened on click and the "1 بالغ" text
+                                 never changed no matter what a customer did. Alpine-only (no
+                                 Livewire round-trip needed for a plain increment/decrement); the
+                                 chosen count flows into checkout via the CTA link's ?travelers=
+                                 query param below, which CheckoutWizard::mount() now reads to
+                                 pre-add that many passenger rows instead of always just one. --}}
+                            <div class="bg-white border border-slate-200 rounded-2xl p-4">
+                                <p class="text-xs text-slate-400 font-medium mb-2">عدد المسافرين</p>
+                                <div class="flex items-center justify-between border border-slate-200 rounded-xl p-1">
+                                    <button type="button"
+                                            @click="travelerCount = Math.max(1, travelerCount - 1)"
+                                            :disabled="travelerCount <= 1"
+                                            class="w-10 h-10 rounded-lg bg-slate-50 hover:bg-slate-100 text-zatara-blue flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        <span class="material-symbols-outlined">remove</span>
+                                    </button>
+                                    <span class="font-bold text-zatara-blue text-lg" x-text="travelerCount"></span>
+                                    <button type="button"
+                                            @click="travelerCount = Math.min(maxTravelers, travelerCount + 1)"
+                                            :disabled="travelerCount >= maxTravelers"
+                                            class="w-10 h-10 rounded-lg bg-slate-50 hover:bg-slate-100 text-zatara-blue flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                                        <span class="material-symbols-outlined">add</span>
+                                    </button>
                                 </div>
-                                <span class="material-symbols-outlined text-zatara-gold">person_add</span>
                             </div>
                         </div>
 
@@ -372,7 +488,22 @@
                         @endif
 
                         @if($selectedInstance && $selectedInstance->remaining_seats > 0)
-                            <a href="{{ route('storefront.checkout', ['tenant' => $tenant->slug, 'tripInstance' => $selectedInstance->id, 'package' => $selectedPackageId]) }}" class="btn-secondary w-full block text-center text-lg shadow-xl shadow-zatara-gold/20 animate-pulse hover:animate-none py-3">
+                            {{-- x-bind:href appends the live traveler count -- a plain Blade href
+                                 would freeze it at whatever value was true on page load, since
+                                 the stepper above is Alpine-only (no Livewire round-trip). The
+                                 separator is computed server-side rather than always assuming
+                                 '&': route() omits the package param entirely (no leading '?' at
+                                 all) whenever no package is selected, so a hardcoded '&' produced
+                                 a malformed "...checkout/48&travelers=3" URL with no '?' -- caught
+                                 during live-verification, not by the Livewire test below (which
+                                 asserts CheckoutWizard's own query-reading, not this href string). --}}
+                            @php
+                                $checkoutBaseUrl = route('storefront.checkout', ['tenant' => $tenant->slug, 'tripInstance' => $selectedInstance->id, 'package' => $selectedPackageId]);
+                                $checkoutUrlSeparator = str_contains($checkoutBaseUrl, '?') ? '&' : '?';
+                            @endphp
+                            <a href="{{ $checkoutBaseUrl }}"
+                               x-bind:href="'{{ $checkoutBaseUrl }}{{ $checkoutUrlSeparator }}travelers=' + travelerCount"
+                               class="btn-secondary w-full block text-center text-lg shadow-xl shadow-zatara-gold/20 animate-pulse hover:animate-none py-3">
                                 بدء إجراءات الحجز
                             </a>
                             <p class="text-center text-xs text-slate-400 font-light mt-4">
@@ -383,6 +514,7 @@
                                 مكتملة العدد
                             </button>
                         @endif
+                        </div>
                     @endif
                 </div>
             </div>

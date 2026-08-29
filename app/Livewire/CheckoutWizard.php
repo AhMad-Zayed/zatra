@@ -70,8 +70,18 @@ class CheckoutWizard extends Component
         // Pass the trip instance ID to the form for strict validation scoping
         $this->form->setTripInstanceId($this->tripInstance->id);
         
-        // Add one default passenger row
-        $this->form->addPassenger();
+        // Add one passenger row per traveler selected on trip-details' stepper (?travelers=N,
+        // defaults to 1 -- unchanged for any link that doesn't pass it). Capped to
+        // remaining_seats so a stale/tampered query value can't request more passenger rows than
+        // the trip can actually seat; each row still just holds a category_id to be chosen here,
+        // same as before.
+        $travelerCount = max(1, min(
+            (int) request('travelers', 1),
+            $this->tripInstance->remaining_seats > 0 ? $this->tripInstance->remaining_seats : 1,
+        ));
+        for ($i = 0; $i < $travelerCount; $i++) {
+            $this->form->addPassenger();
+        }
 
         // Capture Waiting List Hook
         $this->wl_id = request()->query('wl');

@@ -213,6 +213,14 @@
                                 </div>
                             @endif
                             
+                            {{-- Price Badge -- matches the Stitch mockup's overlaid price pill
+                                 (stich_with_google_store/stitch_admin_panel_arabic_rebranding),
+                                 in addition to (not replacing) the detailed price already shown
+                                 below the card, which stays the primary, unambiguous figure. --}}
+                            <div class="absolute top-4 right-4 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm z-10">
+                                <span class="text-sm font-black text-zatara-blue">{{ number_format($template->starting_price) }} {{ $template->currency ?? 'USD' }}</span>
+                            </div>
+
                             {{-- Duration Tag --}}
                             <div class="absolute bottom-4 right-4 glass-panel px-4 py-1.5 rounded-xl shadow-sm z-10">
                                 @if($template->duration_days)

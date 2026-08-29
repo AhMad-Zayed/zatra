@@ -284,6 +284,17 @@ class TripTemplateResource extends Resource
                             ->reorderable()
                             ->collapsible(),
                     ]),
+
+                Forms\Components\Section::make('يشمل / لا يشمل')
+                    ->description('يظهر هذا القسم للعميل في صفحة تفاصيل الرحلة. إن تُركا فارغين، لن يظهر القسم في الصفحة إطلاقاً.')
+                    ->schema([
+                        Forms\Components\TagsInput::make('includes')
+                            ->label('يشمل')
+                            ->placeholder('أضف بنداً واضغط Enter (مثال: تذاكر الطيران ذهاب وعودة)'),
+                        Forms\Components\TagsInput::make('excludes')
+                            ->label('لا يشمل')
+                            ->placeholder('أضف بنداً واضغط Enter (مثال: تأمين السفر)'),
+                    ])->columns(2),
             ]);
     }
 
