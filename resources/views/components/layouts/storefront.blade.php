@@ -96,9 +96,22 @@
                         </a>
                     @endif
 
+                    {{-- The logged-in account icon had no logged-out counterpart at all -- a
+                         returning customer with a real booking had zero visible way to discover
+                         that a login/my-bookings feature even existed (no header icon, no footer
+                         link, nothing). Same icon-button pattern already used for the search
+                         button right above (scrolled-reactive color, no background), so this
+                         doesn't introduce a new visual style -- just a login icon + a
+                         desktop-only text label, staying compact enough to sit next to the
+                         hamburger button on mobile the same way the account icon always did. --}}
                     @auth('customer')
-                        <a href="{{ route('storefront.my-bookings', ['tenant' => $currentTenant->slug]) }}" class="transition-colors" :class="scrolled ? 'text-zatara-blue' : 'text-white'">
+                        <a href="{{ route('storefront.my-bookings', ['tenant' => $currentTenant->slug]) }}" class="transition-colors" :class="scrolled ? 'text-zatara-blue' : 'text-white'" title="حجوزاتي">
                             <span class="material-symbols-outlined text-[32px]" style="font-variation-settings:'FILL' 0">account_circle</span>
+                        </a>
+                    @else
+                        <a href="{{ route('portal.login', ['tenant' => $currentTenant->slug]) }}" class="flex items-center gap-2 font-bold text-sm transition-colors" :class="scrolled ? 'text-zatara-blue hover:text-zatara-gold' : 'text-white hover:text-zatara-gold'" title="تسجيل الدخول">
+                            <span class="material-symbols-outlined text-[28px]">login</span>
+                            <span class="hidden md:inline">تسجيل الدخول</span>
                         </a>
                     @endauth
 
@@ -140,9 +153,25 @@
                 <a href="#" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">info</span> عن زتارة
                 </a>
-                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue flex items-center gap-3">
+                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">call</span> اتصل بنا
                 </a>
+                {{-- The mobile drawer never had a login/account entry at all, in either auth
+                     state -- not a separate gate on the same link, just entirely missing. Same
+                     list-item pattern as the other drawer links above. --}}
+                @if(isset($currentTenant))
+                    @auth('customer')
+                        <a href="{{ route('storefront.my-bookings', ['tenant' => $currentTenant->slug]) }}"
+                           class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[20px] text-zatara-gold">account_circle</span> حجوزاتي
+                        </a>
+                    @else
+                        <a href="{{ route('portal.login', ['tenant' => $currentTenant->slug]) }}"
+                           class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue flex items-center gap-3">
+                            <span class="material-symbols-outlined text-[20px] text-zatara-gold">login</span> تسجيل الدخول
+                        </a>
+                    @endauth
+                @endif
                 @if(isset($currentTenant))
                     <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}"
                        target="_blank"
