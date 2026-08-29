@@ -76,7 +76,15 @@ class TripTemplateResource extends Resource
                             ->required()
                             ->prefix('$')
                             ->helperText('هذا السعر يظهر للواجهة، يمكن تغييره لكل موعد رحلة.'),
-                            
+
+                        Forms\Components\TextInput::make('duration_days')
+                            ->label('مدة الرحلة (بالأيام)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->suffix('أيام')
+                            ->helperText('تظهر هذه المدة في صفحة تفاصيل الرحلة وبطاقة الكتالوج قبل اختيار موعد محدد. اتركها فارغة إن كانت المدة تختلف بشكل كبير بين المواعيد.'),
+
+
                         Forms\Components\Toggle::make('deposit_enabled')
                             ->label('تفعيل الدفع الجزئي (عربون)')
                             ->live()
