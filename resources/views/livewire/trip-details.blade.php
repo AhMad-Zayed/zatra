@@ -234,7 +234,7 @@
                                 </thead>
                                 <tbody>
                                     @foreach($selectedInstance->tripPassengerCategories as $category)
-                                        <tr class="border-b border-slate-100 last:border-b-0">
+                                        <tr class="border-b border-slate-100 last:border-b-0 transition-colors duration-200 hover:bg-slate-50">
                                             <td class="px-6 py-4 font-medium text-slate-700">{{ $category->name }}</td>
                                             <td class="px-6 py-4 font-bold text-zatara-blue">
                                                 @if((float) $category->price > 0)
@@ -267,7 +267,7 @@
                                     <div class="absolute -right-11 w-6 h-6 rounded-full {{ $index === 0 ? 'bg-zatara-gold' : 'bg-zatara-blue' }} border-4 border-white flex items-center justify-center shadow-md text-white text-xs font-bold">
                                         {{ $index + 1 }}
                                     </div>
-                                    <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                                    <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-md hover:border-zatara-blue/20 hover:-translate-y-0.5">
                                         <h3 class="text-lg font-bold text-zatara-blue mb-2">{{ $day['title'] ?? 'اليوم ' . ($index + 1) }}</h3>
                                         <p class="text-slate-500 font-light leading-relaxed">
                                             {{ $day['description'] ?? '' }}
@@ -283,6 +283,35 @@
                     @endif
                 </div>
 
+                {{-- Destination Map -- new fields (migration
+                     2026_09_09_000001_add_destination_coordinates_to_trip_templates). Hidden
+                     entirely (not a broken/blank map) until an admin fills in both coordinates.
+                     OpenStreetMap's export/embed.html iframe needs no API key/credential at all,
+                     unlike Google Maps -- the right default here since nothing else in this app
+                     already has a paid mapping credential to reuse. --}}
+                @if($template->destination_latitude !== null && $template->destination_longitude !== null)
+                    @php
+                        $lat = (float) $template->destination_latitude;
+                        $lng = (float) $template->destination_longitude;
+                        // A small fixed-size box around the point -- wide enough to show real
+                        // surrounding context (city/coastline/etc.) without the marker looking
+                        // lost on an overly zoomed-out map.
+                        $bbox = ($lng - 0.05) . '%2C' . ($lat - 0.05) . '%2C' . ($lng + 0.05) . '%2C' . ($lat + 0.05);
+                    @endphp
+                    <div class="mb-12">
+                        <h2 class="text-2xl font-bold text-zatara-blue mb-6">الموقع على الخريطة</h2>
+                        <div class="rounded-2xl overflow-hidden border border-slate-100 h-80">
+                            <iframe
+                                class="w-full h-full"
+                                style="border: 0"
+                                loading="lazy"
+                                src="https://www.openstreetmap.org/export/embed.html?bbox={{ $bbox }}&marker={{ $lat }}%2C{{ $lng }}&layer=mapnik"
+                                title="موقع {{ $template->title }} على الخريطة">
+                            </iframe>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Includes / Excludes -- new fields (migration
                      2026_09_07_000001_add_includes_excludes_to_trip_templates), matching the
                      Stitch mockup's "يشمل / لا يشمل" two-column section. Hidden entirely (not
@@ -291,7 +320,7 @@
                 @if(!empty($template->includes) || !empty($template->excludes))
                     <div class="mb-12 grid grid-cols-1 sm:grid-cols-2 gap-6">
                         @if(!empty($template->excludes))
-                            <div class="bg-white border border-slate-100 rounded-2xl p-6">
+                            <div class="bg-white border border-slate-100 rounded-2xl p-6 transition-shadow duration-300 hover:shadow-md">
                                 <h3 class="flex items-center gap-2 text-lg font-bold text-zatara-red mb-4">
                                     <span class="material-symbols-outlined">cancel</span>
                                     لا يشمل
@@ -307,7 +336,7 @@
                             </div>
                         @endif
                         @if(!empty($template->includes))
-                            <div class="bg-white border border-slate-100 rounded-2xl p-6">
+                            <div class="bg-white border border-slate-100 rounded-2xl p-6 transition-shadow duration-300 hover:shadow-md">
                                 <h3 class="flex items-center gap-2 text-lg font-bold text-zatara-success mb-4">
                                     <span class="material-symbols-outlined">check_circle</span>
                                     يشمل

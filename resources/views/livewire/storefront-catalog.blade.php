@@ -43,10 +43,15 @@
                 </p>
             </div>
 
-            {{-- Glassmorphism Search Bar --}}
+            {{-- Glassmorphism Search Bar -- this section's own name predates Phase A's
+                 de-glassing of .glass-panel (a shared class used across dozens of other storefront
+                 elements, correctly kept flat there); this specific card floats directly over the
+                 hero photo, where a real backdrop-blur has something to blur, so it now uses the
+                 dedicated .hero-glass-panel treatment instead (resources/css/app.css) rather than
+                 the shared flat card style. --}}
             <!-- Mobile Search Pill -->
             <div class="block md:hidden absolute bottom-12 left-1/2 -translate-x-1/2 w-11/12 z-20">
-                <button class="glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-600 font-medium shadow-lg">
+                <button class="hero-glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-700 font-medium shadow-lg">
                     <span class="material-symbols-outlined text-zatara-blue">search</span>
                     ابحث عن وجهتك...
                     <span class="material-symbols-outlined mr-auto text-zatara-blue">tune</span>
@@ -55,7 +60,7 @@
 
             <!-- Desktop Search Bar -->
             <div class="hidden md:block absolute bottom-12 left-1/2 -translate-x-1/2 w-11/12 max-w-4xl z-20">
-                <div class="glass-panel rounded-3xl p-4 flex flex-col md:flex-row items-center gap-4">
+                <div class="hero-glass-panel rounded-3xl p-4 flex flex-col md:flex-row items-center gap-4">
                     
                     <div class="flex-1 w-full relative">
                         <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">location_on</span>
@@ -84,8 +89,42 @@
         </div>
     </section>
 
+    {{-- TRUST SIGNALS -- homepage visual-density pass. Every fact here is real and already
+         verifiable elsewhere in this app (not invented copy): the tourism license is the same
+         $tenant->tourism_license_number already shown in the site footer; WhatsApp support is
+         the same contact channel the header/footer buttons already link to; cash/bank-transfer
+         are the two payment methods checkout already offers (Stripe is explicitly disabled
+         there); cancellation requests are a real, working feature on the customer's my-bookings
+         page. No star ratings/review counts here -- no review data model exists in this app. --}}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 mb-8">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            @if(!empty($tenant->tourism_license_number))
+                <div class="flex flex-col items-center text-center gap-3 p-6 rounded-3xl border border-slate-100 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                    <span class="material-symbols-outlined text-zatara-gold text-4xl">verified</span>
+                    <p class="font-bold text-zatara-blue text-sm">ترخيص سياحي رسمي</p>
+                    <p class="text-xs text-slate-400">رقم الترخيص: {{ $tenant->tourism_license_number }}</p>
+                </div>
+            @endif
+            <div class="flex flex-col items-center text-center gap-3 p-6 rounded-3xl border border-slate-100 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <span class="material-symbols-outlined text-zatara-gold text-4xl">chat</span>
+                <p class="font-bold text-zatara-blue text-sm">دعم فوري عبر واتساب</p>
+                <p class="text-xs text-slate-400">تواصل معنا مباشرة لأي استفسار</p>
+            </div>
+            <div class="flex flex-col items-center text-center gap-3 p-6 rounded-3xl border border-slate-100 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <span class="material-symbols-outlined text-zatara-gold text-4xl">payments</span>
+                <p class="font-bold text-zatara-blue text-sm">خيارات دفع مرنة</p>
+                <p class="text-xs text-slate-400">دفع نقدي بالمكتب أو حوالة بنكية</p>
+            </div>
+            <div class="flex flex-col items-center text-center gap-3 p-6 rounded-3xl border border-slate-100 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                <span class="material-symbols-outlined text-zatara-gold text-4xl">event_available</span>
+                <p class="font-bold text-zatara-blue text-sm">إلغاء مرن</p>
+                <p class="text-xs text-slate-400">تواصل معنا وسنقوم بمعالجة طلب الإلغاء بسرعة</p>
+            </div>
+        </div>
+    </section>
+
     {{-- FLIGHT PATH DIVIDER --}}
-    <div class="max-w-4xl mx-auto my-24 flex items-center gap-4 opacity-50 px-4">
+    <div class="max-w-4xl mx-auto my-16 flex items-center gap-4 opacity-50 px-4">
         <div class="w-2 h-2 rounded-full bg-zatara-gold"></div>
         <div class="flight-path flex-1"></div>
         <span class="material-symbols-outlined text-zatara-blue rotate-90 text-3xl">flight</span>

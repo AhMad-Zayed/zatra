@@ -84,6 +84,18 @@ class TripTemplateResource extends Resource
                             ->suffix('أيام')
                             ->helperText('تظهر هذه المدة في صفحة تفاصيل الرحلة وبطاقة الكتالوج قبل اختيار موعد محدد. اتركها فارغة إن كانت المدة تختلف بشكل كبير بين المواعيد.'),
 
+                        Forms\Components\TextInput::make('destination_latitude')
+                            ->label('خط العرض (Latitude)')
+                            ->numeric()
+                            ->minValue(-90)
+                            ->maxValue(90)
+                            ->helperText('يظهر قسم "الموقع على الخريطة" في صفحة تفاصيل الرحلة فقط عند تعبئة كل من خط العرض وخط الطول معاً.'),
+
+                        Forms\Components\TextInput::make('destination_longitude')
+                            ->label('خط الطول (Longitude)')
+                            ->numeric()
+                            ->minValue(-180)
+                            ->maxValue(180),
 
                         Forms\Components\Toggle::make('deposit_enabled')
                             ->label('تفعيل الدفع الجزئي (عربون)')
