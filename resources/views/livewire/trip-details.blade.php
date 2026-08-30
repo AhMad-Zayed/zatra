@@ -92,8 +92,8 @@
                      fallback here) doesn't actually exist in the repo, so this used to render a
                      broken image icon instead of a graceful empty state. Matches the same
                      gradient+icon placeholder the catalog card already uses. --}}
-                <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative bg-gradient-to-br from-zatara-blue/20 to-zatara-gold/20 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-zatara-blue/30 text-8xl">flight</span>
+                <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative">
+                    <x-trip-cover-placeholder :seed="$template->id" />
                 </div>
             @elseif($count == 1)
                 <div class="w-full h-[60vh] rounded-[2.5rem] overflow-hidden relative">

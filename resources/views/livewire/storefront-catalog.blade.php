@@ -140,55 +140,57 @@
         </div>
     </section>
 
-    {{-- BENTO GRID TRIP CARDS + FILTER SIDEBAR --}}
+    {{-- TRIP CARDS + FILTER BAR --}}
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32">
-      <div class="flex flex-col lg:flex-row gap-8 items-start">
 
-        {{-- Storefront redesign Phase F, item 1: filter sidebar. Functional idea only (price
-             range + category filter), not a copy of any particular mockup's visual treatment. --}}
-        <aside class="w-full lg:w-72 shrink-0 bg-white border border-slate-100 rounded-3xl p-6 lg:sticky lg:top-24">
-            <h3 class="text-lg font-bold text-zatara-blue mb-6">تصفية النتائج</h3>
+        {{-- Storefront redesign: inline pill/chip filter bar, replacing the previous
+             `w-full lg:w-72` sidebar. The sidebar's price-range + 2-option category filter
+             (داخلي/خارجي, TripTypeEnum) left most of a whole column empty next to the grid --
+             a dated e-commerce layout convention. Every wire:model/wire:click binding below is
+             identical to the old sidebar's (categories, priceMin, priceMax, resetFilters()),
+             so app/Livewire/StorefrontCatalog.php and tests/Feature/StorefrontPhaseFTest.php's
+             filter assertions are untouched. --}}
+        <div class="flex flex-wrap items-center gap-3 mb-8 bg-white border border-slate-100 rounded-2xl p-3 sm:p-4" x-data="{ priceOpen: false }">
+            <span class="text-sm font-bold text-slate-500 px-2 hidden sm:inline">تصفية:</span>
 
-            <div class="mb-8">
-                <p class="text-sm font-bold text-slate-500 mb-3">نطاق السعر</p>
-                <div class="flex items-center gap-3">
-                    <div class="flex-1">
-                        <label class="text-xs text-slate-400 block mb-1">من</label>
-                        <input type="number" min="0" wire:model.live.debounce.500ms="priceMin"
-                               placeholder="0" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
-                    </div>
-                    <div class="flex-1">
-                        <label class="text-xs text-slate-400 block mb-1">إلى</label>
-                        <input type="number" min="0" wire:model.live.debounce.500ms="priceMax"
-                               placeholder="{{ $priceCeiling }}" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
+            @foreach($categoryOptions as $option)
+                <label class="cursor-pointer select-none px-4 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-600 transition-all duration-200 has-[:checked]:bg-zatara-blue has-[:checked]:text-white has-[:checked]:border-zatara-blue hover:border-zatara-blue/40">
+                    <input type="checkbox" wire:model.live="categories" value="{{ $option->value }}" class="sr-only">
+                    {{ $option->getLabel() }}
+                </label>
+            @endforeach
+
+            <div class="relative" @click.outside="priceOpen = false">
+                <button type="button" @click="priceOpen = !priceOpen"
+                        class="flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-bold transition-all duration-200 {{ ($priceMin !== null || $priceMax !== null) ? 'bg-zatara-blue text-white border-zatara-blue' : 'border-slate-200 text-slate-600 hover:border-zatara-blue/40' }}">
+                    <span class="material-symbols-outlined text-[18px]">tune</span>
+                    نطاق السعر
+                </button>
+                <div x-show="priceOpen" x-transition style="display: none;" class="absolute z-20 top-full mt-2 right-0 bg-white border border-slate-100 rounded-2xl shadow-xl p-4 w-64">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-1">
+                            <label class="text-xs text-slate-400 block mb-1">من</label>
+                            <input type="number" min="0" wire:model.live.debounce.500ms="priceMin"
+                                   placeholder="0" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs text-slate-400 block mb-1">إلى</label>
+                            <input type="number" min="0" wire:model.live.debounce.500ms="priceMax"
+                                   placeholder="{{ $priceCeiling }}" class="glass-input w-full px-3 py-2 text-sm rounded-xl">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            @if(count($categoryOptions) > 0)
-                <div>
-                    <p class="text-sm font-bold text-slate-500 mb-3">الفئة</p>
-                    <div class="space-y-2">
-                        @foreach($categoryOptions as $option)
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" wire:model.live="categories" value="{{ $option->value }}"
-                                       class="w-4 h-4 rounded border-slate-300 text-zatara-blue focus:ring-zatara-blue/40">
-                                <span class="text-sm text-slate-600 font-medium">{{ $option->getLabel() }}</span>
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
             @if($priceMin !== null || $priceMax !== null || !empty($categories))
                 <button type="button" wire:click="resetFilters"
-                        class="mt-6 text-sm text-zatara-gold hover:text-zatara-blue font-bold transition-colors">
+                        class="mr-auto text-sm text-zatara-gold hover:text-zatara-blue font-bold transition-colors">
                     إعادة ضبط التصفية
                 </button>
             @endif
-        </aside>
+        </div>
 
-        <div class="flex-1 w-full min-w-0">
+        <div class="w-full">
         @if($tripTemplates->isEmpty())
             <div class="glass-panel rounded-3xl p-20 text-center">
                 <span class="material-symbols-outlined text-6xl text-slate-300 mb-4 block">luggage</span>
@@ -247,9 +249,7 @@
                                      loading="lazy"
                                      alt="{{ $template->title ?? 'صورة الرحلة' }}" class="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
                             @else
-                                <div class="w-full h-full bg-gradient-to-br from-zatara-blue/20 to-zatara-gold/20 flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-zatara-blue/30 text-6xl">flight</span>
-                                </div>
+                                <x-trip-cover-placeholder :seed="$template->id" />
                             @endif
                             
                             {{-- Price Badge -- matches the Stitch mockup's overlaid price pill
@@ -314,7 +314,6 @@
             </div>
         @endif
         </div>
-      </div>
     </section>
 
 </div>
