@@ -6,8 +6,8 @@
 
     {{-- CINEMATIC HERO SECTION (Rounded Container) --}}
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-        <div class="relative w-full h-[85vh] rounded-[2.5rem] overflow-hidden shadow-2xl shadow-zatara-blue/10 flex items-center justify-center">
-            
+        <div class="relative w-full min-h-[600px] h-[80vh] rounded-[2.5rem] overflow-hidden shadow-2xl shadow-zatara-blue/10 flex flex-col">
+
             {{-- Background Image with slow pan. Above-the-fold LCP element -- eager-loaded on
                  purpose (no loading="lazy"), but capped to the 'hero' conversion instead of
                  whatever resolution it was originally uploaded at. --}}
@@ -17,8 +17,16 @@
             @if($heroImage)
                 <img src="{{ $heroImage }}" alt="Hero Image" class="absolute inset-0 w-full h-full object-cover animate-slowPan" />
             @else
+                {{-- Hero redesign: the previous fallback was a near-flat two-tone gradient with a
+                     pattern at opacity-10 -- close to invisible in practice, reading as a plain
+                     dark rectangle. Layered "aurora" blobs (brand colors only, .animate-float
+                     already defined in resources/css/app.css) plus a more visible pattern give it
+                     real depth without needing a real photo. --}}
                 <div class="absolute inset-0 w-full h-full bg-gradient-to-br from-zatara-blue via-zatara-blue/90 to-slate-900 animate-slowPan">
-                    <svg class="absolute inset-0 w-full h-full opacity-10 mix-blend-overlay" xmlns="http://www.w3.org/2000/svg">
+                    <div class="absolute -top-24 -right-24 w-[28rem] h-[28rem] rounded-full bg-zatara-gold/40 blur-3xl animate-float"></div>
+                    <div class="absolute top-1/3 -left-32 w-[24rem] h-[24rem] rounded-full bg-white/15 blur-3xl animate-float" style="animation-delay: -2s"></div>
+                    <div class="absolute -bottom-32 right-1/4 w-[26rem] h-[26rem] rounded-full bg-zatara-gold/20 blur-3xl animate-float" style="animation-delay: -4s"></div>
+                    <svg class="absolute inset-0 w-full h-full opacity-20 mix-blend-overlay" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <pattern id="pattern" width="100" height="100" patternUnits="userSpaceOnUse">
                                 <circle cx="50" cy="50" r="10" fill="currentColor"></circle>
@@ -29,61 +37,75 @@
                     </svg>
                 </div>
             @endif
-            
+
             {{-- Overlay --}}
             <div class="absolute inset-0 bg-black/20"></div>
 
-            {{-- Hero Content --}}
-            <div class="relative z-10 text-center text-white px-4 -mt-16">
-                <h1 class="text-4xl md:text-7xl font-bold tracking-tight mb-6 leading-tight drop-shadow-lg font-arabic">
-                    رحلتك القادمة تبدأ من هنا
-                </h1>
-                <p class="text-lg md:text-2xl font-light text-white/95 max-w-3xl mx-auto drop-shadow-md">
-                    اكتشف أروع الوجهات حول العالم بتجربة حجز فائقة السلاسة والرفاهية.
-                </p>
-            </div>
+            {{-- Hero redesign: heading and search bar used to be laid out independently (heading
+                 centered via flex items-center on the whole box, search bar separately pinned via
+                 absolute bottom-12) -- live-confirmed this left a ~300-400px dead gap between the
+                 subtitle and the search bar on desktop with nothing filling it intentionally. Now a
+                 single flex-col justify-between column carries both, so the gap is a deliberate,
+                 proportionate result of the flex layout instead of a leftover. --}}
+            <div class="relative z-10 flex-1 flex flex-col justify-center gap-12 md:gap-16 px-4 py-14 md:py-20">
+                <div class="text-center text-white">
+                    <h1 class="text-4xl md:text-7xl font-bold tracking-tight mb-6 leading-tight drop-shadow-lg font-arabic">
+                        رحلتك القادمة تبدأ من هنا
+                    </h1>
+                    <p class="text-lg md:text-2xl font-light text-white/95 max-w-3xl mx-auto drop-shadow-md mb-8">
+                        اكتشف أروع الوجهات حول العالم بتجربة حجز فائقة السلاسة والرفاهية.
+                    </p>
+                    <a href="#trips" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border border-white/40 text-white font-bold hover:bg-white hover:text-zatara-blue transition-all duration-300">
+                        <span class="material-symbols-outlined text-[20px]">explore</span>
+                        تصفح جميع الرحلات
+                    </a>
+                </div>
 
-            {{-- Glassmorphism Search Bar -- this section's own name predates Phase A's
-                 de-glassing of .glass-panel (a shared class used across dozens of other storefront
-                 elements, correctly kept flat there); this specific card floats directly over the
-                 hero photo, where a real backdrop-blur has something to blur, so it now uses the
-                 dedicated .hero-glass-panel treatment instead (resources/css/app.css) rather than
-                 the shared flat card style. --}}
-            <!-- Mobile Search Pill -->
-            <div class="block md:hidden absolute bottom-12 left-1/2 -translate-x-1/2 w-11/12 z-20">
-                <button class="hero-glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-700 font-medium shadow-lg">
-                    <span class="material-symbols-outlined text-zatara-blue">search</span>
-                    ابحث عن وجهتك...
-                    <span class="material-symbols-outlined mr-auto text-zatara-blue">tune</span>
-                </button>
-            </div>
-
-            <!-- Desktop Search Bar -->
-            <div class="hidden md:block absolute bottom-12 left-1/2 -translate-x-1/2 w-11/12 max-w-4xl z-20">
-                <div class="hero-glass-panel rounded-3xl p-4 flex flex-col md:flex-row items-center gap-4">
-                    
-                    <div class="flex-1 w-full relative">
-                        <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">location_on</span>
-                        <input type="text" wire:model.live.debounce.300ms="searchDestination" placeholder="الوجهة (مثال: سويسرا، دبي)" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
-                    </div>
-                    
-                    <div class="hidden md:block w-[1px] h-10 bg-zatara-blue/10"></div>
-                    
-                    <div class="flex-1 w-full relative">
-                        <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">calendar_month</span>
-                        <input type="text" wire:model.live="searchDate" placeholder="تاريخ السفر" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
+                {{-- Glassmorphism Search Bar -- this section's own name predates Phase A's
+                     de-glassing of .glass-panel (a shared class used across dozens of other
+                     storefront elements, correctly kept flat there); this specific card floats
+                     directly over the hero photo, where a real backdrop-blur has something to
+                     blur, so it now uses the dedicated .hero-glass-panel treatment instead
+                     (resources/css/app.css) rather than the shared flat card style. --}}
+                <div>
+                    <!-- Mobile Search Pill -->
+                    <div class="block md:hidden w-full">
+                        <button class="hero-glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-700 font-medium shadow-lg">
+                            <span class="material-symbols-outlined text-zatara-blue">search</span>
+                            ابحث عن وجهتك...
+                            <span class="material-symbols-outlined mr-auto text-zatara-blue">tune</span>
+                        </button>
                     </div>
 
-                    {{-- The "guests" field that used to sit here had no wire:model at all -- typing
-                         into it did nothing, implying a filter capability this search bar doesn't
-                         actually have. Live-confirmed, docs/STOREFRONT_UX_AUDIT.md (Quick Win #5).
-                         Removed rather than wired up, since there's no guest-count filter query to
-                         connect it to yet. --}}
+                    <!-- Desktop Search Bar -->
+                    <div class="hidden md:block w-full max-w-4xl mx-auto">
+                        <div class="hero-glass-panel rounded-3xl p-4 flex flex-col md:flex-row items-center gap-4">
 
-                    <button class="btn-primary w-full md:w-auto px-10 py-4 text-lg font-bold flex items-center justify-center gap-2">
-                        <span class="material-symbols-outlined">search</span>
-                        بحث
-                    </button>
+                            <div class="flex-1 w-full relative">
+                                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">location_on</span>
+                                <input type="text" wire:model.live.debounce.300ms="searchDestination" placeholder="الوجهة (مثال: سويسرا، دبي)" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
+                            </div>
+
+                            <div class="hidden md:block w-[1px] h-10 bg-zatara-blue/10"></div>
+
+                            <div class="flex-1 w-full relative">
+                                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">calendar_month</span>
+                                <input type="text" wire:model.live="searchDate" placeholder="تاريخ السفر" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
+                            </div>
+
+                            {{-- The "guests" field that used to sit here had no wire:model at all --
+                                 typing into it did nothing, implying a filter capability this search
+                                 bar doesn't actually have. Live-confirmed,
+                                 docs/STOREFRONT_UX_AUDIT.md (Quick Win #5). Removed rather than
+                                 wired up, since there's no guest-count filter query to connect it to
+                                 yet. --}}
+
+                            <button class="btn-primary w-full md:w-auto px-10 py-4 text-lg font-bold flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined">search</span>
+                                بحث
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -131,7 +153,7 @@
     </div>
 
     {{-- TRENDING DESTINATIONS HEADER --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12">
+    <section id="trips" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 scroll-mt-24">
         <div class="flex flex-col md:flex-row justify-between items-end gap-6">
             <div>
                 <span class="text-zatara-gold text-sm tracking-widest font-bold block mb-2">الوجهات الرائجة</span>
