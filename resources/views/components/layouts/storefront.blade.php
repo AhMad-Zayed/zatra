@@ -78,10 +78,25 @@
 
                 {{-- Actions --}}
                 <div class="flex items-center gap-4 flex-shrink-0">
-                    {{-- Search Icon (Micro-interaction) --}}
-                    <button class="transition-colors hidden md:block" :class="scrolled ? 'text-zatara-blue hover:text-zatara-gold' : 'text-white hover:text-zatara-gold'">
-                        <span class="material-symbols-outlined text-[28px]">search</span>
-                    </button>
+                    {{-- Search Icon -- had zero click handler at all (purely decorative, labeled
+                         "Micro-interaction" in the original markup) -- live-confirmed while
+                         investigating a user report that the search bar "isn't working". On the
+                         catalog page (the only page with a search bar) it scrolls up to the hero
+                         and opens the mobile search panel if collapsed; on every other page
+                         (trip-details, checkout, my-bookings, ...) there's no search UI on the
+                         page at all, so it navigates to the catalog page instead. --}}
+                    @if(request()->routeIs('storefront.catalog'))
+                        <button type="button"
+                                @click="document.getElementById('hero')?.scrollIntoView({behavior:'smooth', block:'start'}); window.dispatchEvent(new CustomEvent('open-hero-search'))"
+                                class="transition-colors hidden md:block" :class="scrolled ? 'text-zatara-blue hover:text-zatara-gold' : 'text-white hover:text-zatara-gold'">
+                            <span class="material-symbols-outlined text-[28px]">search</span>
+                        </button>
+                    @else
+                        <a href="{{ route('storefront.catalog', ['tenant' => $currentTenant->slug]) }}"
+                           class="transition-colors hidden md:block" :class="scrolled ? 'text-zatara-blue hover:text-zatara-gold' : 'text-white hover:text-zatara-gold'">
+                            <span class="material-symbols-outlined text-[28px]">search</span>
+                        </a>
+                    @endif
 
                     {{-- WhatsApp Button --}}
                     @if(isset($currentTenant))

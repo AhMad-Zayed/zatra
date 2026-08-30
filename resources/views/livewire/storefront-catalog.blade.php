@@ -5,7 +5,7 @@
          ========================== --}}
 
     {{-- CINEMATIC HERO SECTION (Rounded Container) --}}
-    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+    <section id="hero" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 scroll-mt-6">
         <div class="relative w-full min-h-[600px] h-[80vh] rounded-[2.5rem] overflow-hidden shadow-2xl shadow-zatara-blue/10 flex flex-col">
 
             {{-- Background Image with slow pan. Above-the-fold LCP element -- eager-loaded on
@@ -66,15 +66,53 @@
                      storefront elements, correctly kept flat there); this specific card floats
                      directly over the hero photo, where a real backdrop-blur has something to
                      blur, so it now uses the dedicated .hero-glass-panel treatment instead
-                     (resources/css/app.css) rather than the shared flat card style. --}}
-                <div>
+                     (resources/css/app.css) rather than the shared flat card style.
+
+                     Bug fix (live-reproduced, user report "search bar not working"): three
+                     separate, real problems, not one --
+                     (1) this whole block on mobile was a plain <button> with no wire:model
+                     bindings and no click handler at all -- literally decorative, 100% dead;
+                     (2) the date field was type="text" with no actual date-picker UI at all, so
+                     "picking a date" was never possible in the first place, and free-typed text
+                     that isn't an exact ISO date silently matched every trip instead of filtering
+                     (confirmed live: typing "hello world" changed nothing, no error, no feedback);
+                     (3) even the working desktop destination filter gave zero visible feedback,
+                     since the grid it filters sits below the fold -- typing/picking felt broken
+                     even when the backend correctly updated it. Fixed here: mobile gets a real
+                     toggle-open panel with the same bound inputs the desktop bar already had;
+                     both date fields are now native type="date" (real browser picker, and
+                     guarantees the exact YYYY-MM-DD format app/Livewire/StorefrontCatalog.php's
+                     query already expected -- that PHP file itself is untouched); Enter/submit now
+                     scroll down to the #trips grid so the result is actually visible. --}}
+                <div x-data="{ mobileSearchOpen: false }" @open-hero-search.window="mobileSearchOpen = true">
                     <!-- Mobile Search Pill -->
                     <div class="block md:hidden w-full">
-                        <button class="hero-glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-700 font-medium shadow-lg">
+                        <button type="button" @click="mobileSearchOpen = !mobileSearchOpen" class="hero-glass-panel w-full rounded-full py-4 px-6 flex items-center gap-3 text-slate-700 font-medium shadow-lg">
                             <span class="material-symbols-outlined text-zatara-blue">search</span>
                             ابحث عن وجهتك...
-                            <span class="material-symbols-outlined mr-auto text-zatara-blue">tune</span>
+                            <span class="material-symbols-outlined mr-auto text-zatara-blue transition-transform duration-300" :class="mobileSearchOpen ? 'rotate-180' : ''">expand_more</span>
                         </button>
+
+                        <div x-show="mobileSearchOpen" x-transition style="display: none;" class="hero-glass-panel mt-3 rounded-3xl p-4 flex flex-col gap-3">
+                            <div class="relative">
+                                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">location_on</span>
+                                <input type="text" wire:model.live.debounce.300ms="searchDestination" placeholder="الوجهة (مثال: سويسرا، دبي)"
+                                       @keydown.enter="mobileSearchOpen = false; document.getElementById('trips')?.scrollIntoView({behavior:'smooth'})"
+                                       class="w-full bg-white border border-slate-200 rounded-2xl text-slate-800 text-base font-medium pr-12 pl-4 py-3 focus:ring-2 focus:ring-zatara-blue/20 focus:border-zatara-blue placeholder:text-slate-400 placeholder:font-light" />
+                            </div>
+                            <div class="relative">
+                                {{-- No custom calendar icon here -- native type="date" inputs
+                                     already render their own picker-indicator icon; overlaying
+                                     material-symbols' calendar_month on top of it produced two
+                                     visibly duplicated calendar icons side by side, confirmed via
+                                     screenshot. --}}
+                                <input type="date" wire:model.live="searchDate" class="w-full bg-white border border-slate-200 rounded-2xl text-slate-800 text-base font-medium px-4 py-3 focus:ring-2 focus:ring-zatara-blue/20 focus:border-zatara-blue" />
+                            </div>
+                            <button type="button" @click="mobileSearchOpen = false; document.getElementById('trips')?.scrollIntoView({behavior:'smooth'})" class="btn-primary w-full py-3 text-base font-bold flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined">search</span>
+                                بحث
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Desktop Search Bar -->
@@ -83,14 +121,19 @@
 
                             <div class="flex-1 w-full relative">
                                 <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">location_on</span>
-                                <input type="text" wire:model.live.debounce.300ms="searchDestination" placeholder="الوجهة (مثال: سويسرا، دبي)" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
+                                <input id="hero-search-destination" type="text" wire:model.live.debounce.300ms="searchDestination" placeholder="الوجهة (مثال: سويسرا، دبي)"
+                                       @keydown.enter="document.getElementById('trips')?.scrollIntoView({behavior:'smooth'})"
+                                       class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
                             </div>
 
                             <div class="hidden md:block w-[1px] h-10 bg-zatara-blue/10"></div>
 
                             <div class="flex-1 w-full relative">
-                                <span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-zatara-blue/60">calendar_month</span>
-                                <input type="text" wire:model.live="searchDate" placeholder="تاريخ السفر" class="w-full bg-transparent border-none text-slate-800 text-lg font-medium pr-12 pl-4 py-3 focus:ring-0 placeholder:text-slate-400 placeholder:font-light" />
+                                {{-- No custom calendar icon here -- see the mobile panel's date
+                                     field comment above for why. --}}
+                                <input type="date" wire:model.live="searchDate"
+                                       @keydown.enter="document.getElementById('trips')?.scrollIntoView({behavior:'smooth'})"
+                                       class="w-full bg-transparent border-none text-slate-800 text-lg font-medium px-4 py-3 focus:ring-0" />
                             </div>
 
                             {{-- The "guests" field that used to sit here had no wire:model at all --
@@ -100,7 +143,7 @@
                                  wired up, since there's no guest-count filter query to connect it to
                                  yet. --}}
 
-                            <button class="btn-primary w-full md:w-auto px-10 py-4 text-lg font-bold flex items-center justify-center gap-2">
+                            <button type="button" @click="document.getElementById('trips')?.scrollIntoView({behavior:'smooth'})" class="btn-primary w-full md:w-auto px-10 py-4 text-lg font-bold flex items-center justify-center gap-2">
                                 <span class="material-symbols-outlined">search</span>
                                 بحث
                             </button>
