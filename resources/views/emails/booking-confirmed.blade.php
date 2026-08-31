@@ -16,7 +16,7 @@
                     <tr>
                         <td style="background-color: #0f172a; padding: 30px; text-align: center; border-bottom: 3px solid #f59e0b;">
                             <h1 style="color: #f59e0b; margin: 0; font-size: 28px; font-weight: bold;">{{ $booking->tenant->name }}</h1>
-                            <p style="color: #94a3b8; margin: 10px 0 0 0; font-size: 14px;">اكتشف العالم بالفخامة التي تستحقها</p>
+                            <p style="color: #94a3b8; margin: 10px 0 0 0; font-size: 14px;">{{ $booking->tenant->settings['agency_tagline'] ?? 'اكتشف العالم بالفخامة التي تستحقها' }}</p>
                         </td>
                     </tr>
 
@@ -35,7 +35,7 @@
                                     </td>
                                     <td style="padding-bottom: 10px;">
                                         <span style="color: #64748b; font-size: 13px;">الرحلة:</span><br>
-                                        <strong style="color: #0f172a; font-size: 16px;">{{ $booking->tripInstance->template->title }}</strong>
+                                        <strong style="color: #0f172a; font-size: 16px;">{{ $booking->tripInstance->tripTemplate->title }}</strong>
                                     </td>
                                 </tr>
                                 <tr>
@@ -55,7 +55,7 @@
                             </p>
 
                             <div style="text-align: center; margin-top: 35px;">
-                                <a href="{{ route('storefront.catalog', ['tenant_slug' => $booking->tenant->slug]) }}" style="background-color: #f59e0b; color: #0f172a; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">
+                                <a href="{{ route('storefront.catalog', ['tenant' => $booking->tenant->slug]) }}" style="background-color: #f59e0b; color: #0f172a; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; display: inline-block;">
                                     الذهاب لبوابتي
                                 </a>
                             </div>

@@ -11,10 +11,13 @@ use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 
 class ManageAgencySettings extends Page
 {
@@ -57,6 +60,12 @@ class ManageAgencySettings extends Page
             'tiktok_url' => $tenant->settings['tiktok_url'] ?? '',
             'faqs' => $tenant->settings['faqs'] ?? [],
             'waiting_list_channel' => $tenant->settings['waiting_list_channel'] ?? 'both',
+            'agency_tagline' => $tenant->settings['agency_tagline'] ?? '',
+            'meta_description' => $tenant->settings['meta_description'] ?? '',
+            'hero_headline' => $tenant->settings['hero_headline'] ?? '',
+            'hero_subheading' => $tenant->settings['hero_subheading'] ?? '',
+            'trips_section_eyebrow' => $tenant->settings['trips_section_eyebrow'] ?? '',
+            'trips_section_title' => $tenant->settings['trips_section_title'] ?? '',
         ]);
     }
 
@@ -64,6 +73,61 @@ class ManageAgencySettings extends Page
     {
         return $form
             ->schema([
+                Section::make('العلامة التجارية والمحتوى التسويقي')
+                    ->description('يظهر هذا المحتوى في الصفحة الرئيسية لمتجر الوكالة ورسائل تأكيد الحجز.')
+                    ->schema([
+                        Placeholder::make('logo_preview')
+                            ->label('الشعار الحالي')
+                            ->content(fn () => Filament::getTenant()->hasMedia('logo')
+                                ? new HtmlString('<img src="'.e(Filament::getTenant()->getFirstMediaUrl('logo')).'" style="height:48px" alt="Logo">')
+                                : 'لم يتم رفع شعار بعد.'),
+                        FileUpload::make('logo')
+                            ->label('رفع شعار جديد')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('agency-uploads/logo')
+                            ->helperText('يظهر في رأس صفحات المتجر. ارفع صورة جديدة لاستبدال الشعار الحالي.'),
+
+                        Placeholder::make('hero_image_preview')
+                            ->label('صورة الغلاف الحالية للصفحة الرئيسية')
+                            ->content(fn () => Filament::getTenant()->hasMedia('hero_image')
+                                ? new HtmlString('<img src="'.e(Filament::getTenant()->getFirstMediaUrl('hero_image')).'" style="height:120px;border-radius:12px" alt="Hero">')
+                                : 'لم يتم رفع صورة غلاف بعد — سيتم عرض خلفية افتراضية.'),
+                        FileUpload::make('hero_image')
+                            ->label('رفع صورة غلاف جديدة')
+                            ->image()
+                            ->imageEditor()
+                            ->disk('public')
+                            ->directory('agency-uploads/hero')
+                            ->helperText('صورة الخلفية الكبيرة أعلى الصفحة الرئيسية للمتجر.'),
+
+                        TextInput::make('agency_tagline')
+                            ->label('الشعار التعريفي (Tagline)')
+                            ->helperText('جملة قصيرة تعرّف بالوكالة — تظهر في تذييل المتجر ورسائل تأكيد الحجز.')
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+                        Textarea::make('meta_description')
+                            ->label('وصف SEO (Meta Description)')
+                            ->helperText('يظهر في نتائج محركات البحث ومعاينات مشاركة الروابط.')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->columnSpanFull(),
+                        Grid::make(2)->schema([
+                            TextInput::make('hero_headline')
+                                ->label('عنوان الصفحة الرئيسية')
+                                ->maxLength(255),
+                            TextInput::make('hero_subheading')
+                                ->label('العنوان الفرعي للصفحة الرئيسية')
+                                ->maxLength(500),
+                            TextInput::make('trips_section_eyebrow')
+                                ->label('التسمية الصغيرة فوق قسم الرحلات')
+                                ->maxLength(100),
+                            TextInput::make('trips_section_title')
+                                ->label('عنوان قسم الرحلات'),
+                        ]),
+                    ]),
+
                 Section::make('معلومات الاتصال وحسابات التواصل')
                     ->description('يتم حفظ هذه البيانات بتنسيق JSON (بيانات خفيفة).')
                     ->schema([
@@ -173,7 +237,8 @@ class ManageAgencySettings extends Page
             $lightDataKeys = [
                 'contact_phone', 'contact_email', 'office_address', 'working_hours',
                 'whatsapp_number', 'facebook_url', 'instagram_url', 'tiktok_url', 'faqs',
-                'waiting_list_channel'
+                'waiting_list_channel', 'agency_tagline', 'meta_description',
+                'hero_headline', 'hero_subheading', 'trips_section_eyebrow', 'trips_section_title',
             ];
 
             // Merge Light Data into the existing JSON settings
@@ -188,6 +253,26 @@ class ManageAgencySettings extends Page
             $tenant->update(array_merge($heavyData, [
                 'settings' => $currentSettings,
             ]));
+
+            // Logo/hero image: FileUpload (plain, not Spatie-media-bound -- this custom Page has
+            // no Filament\Resources record-binding lifecycle for SpatieMediaLibraryFileUpload's
+            // loadStateFromRelationshipsUsing/saveRelationshipsUsing to hook into) leaves the
+            // uploaded file sitting on the 'public' disk as a plain path string; only actually
+            // attach it to the tenant's media collection (replacing any existing singleFile media)
+            // when a new file was uploaded this submission -- an empty field must never wipe out
+            // an already-uploaded logo/hero image.
+            if (!empty($data['logo'])) {
+                $tenant->addMediaFromDisk($data['logo'], 'public')->toMediaCollection('logo');
+            }
+            if (!empty($data['hero_image'])) {
+                $tenant->addMediaFromDisk($data['hero_image'], 'public')->toMediaCollection('hero_image');
+            }
+
+            // Clear the upload fields so the form doesn't show a stale "selected file" after a
+            // successful save -- the Placeholder previews above re-fetch the tenant's fresh media
+            // URL on every render, so the current image is still visible either way.
+            $this->data['logo'] = null;
+            $this->data['hero_image'] = null;
 
             Notification::make()
                 ->title('تم حفظ الإعدادات بنجاح')

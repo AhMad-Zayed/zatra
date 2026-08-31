@@ -127,7 +127,7 @@
                         جاري التحميل...
                     </span>
                 </button>
-                <a href="https://wa.me/{{ $booking->tenant->settings['whatsapp'] ?? '1234567890' }}?text={{ urlencode('مرحباً زتارة، أود الدفع عبر التحويل البنكي لحجزي المبدئي رقم: ' . $booking->pnr) }}" target="_blank"
+                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $booking->tenant->settings['whatsapp_number'] ?? '970599000000') }}?text={{ urlencode('مرحباً ' . $booking->tenant->name . '، أود الدفع عبر التحويل البنكي لحجزي المبدئي رقم: ' . $booking->pnr) }}" target="_blank"
                     class="flex-1 bg-[#25D366] text-white px-8 py-4 rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2">
                     <span class="material-symbols-outlined">chat</span>
                     تواصل معنا (واتساب)

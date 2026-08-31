@@ -50,10 +50,10 @@
             <div class="relative z-10 flex-1 flex flex-col justify-center gap-12 md:gap-16 px-4 py-14 md:py-20">
                 <div class="text-center text-white">
                     <h1 class="text-4xl md:text-7xl font-bold tracking-tight mb-6 leading-tight drop-shadow-lg font-arabic">
-                        رحلتك القادمة تبدأ من هنا
+                        {{ $tenant->settings['hero_headline'] ?? 'رحلتك القادمة تبدأ من هنا' }}
                     </h1>
                     <p class="text-lg md:text-2xl font-light text-white/95 max-w-3xl mx-auto drop-shadow-md mb-8">
-                        اكتشف أروع الوجهات حول العالم بتجربة حجز فائقة السلاسة والرفاهية.
+                        {{ $tenant->settings['hero_subheading'] ?? 'اكتشف أروع الوجهات حول العالم بتجربة حجز فائقة السلاسة والرفاهية.' }}
                     </p>
                     <a href="#trips" class="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border border-white/40 text-white font-bold hover:bg-white hover:text-zatara-blue transition-all duration-300">
                         <span class="material-symbols-outlined text-[20px]">explore</span>
@@ -199,8 +199,8 @@
     <section id="trips" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-12 scroll-mt-24">
         <div class="flex flex-col md:flex-row justify-between items-end gap-6">
             <div>
-                <span class="text-zatara-gold text-sm tracking-widest font-bold block mb-2">الوجهات الرائجة</span>
-                <h2 class="text-4xl md:text-5xl font-bold text-zatara-blue">اختر مغامرتك القادمة</h2>
+                <span class="text-zatara-gold text-sm tracking-widest font-bold block mb-2">{{ $tenant->settings['trips_section_eyebrow'] ?? 'الوجهات الرائجة' }}</span>
+                <h2 class="text-4xl md:text-5xl font-bold text-zatara-blue">{{ $tenant->settings['trips_section_title'] ?? 'اختر مغامرتك القادمة' }}</h2>
             </div>
         </div>
     </section>

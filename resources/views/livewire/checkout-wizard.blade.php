@@ -97,7 +97,7 @@
             <!-- STEP 1: Lead Capture -->
             <div x-show="step === 1" x-transition.opacity.duration.300ms class="space-y-8">
                 <div class="text-center mb-10">
-                    <h2 class="text-3xl font-bold text-zatara-blue">مرحباً بك في زتارة</h2>
+                    <h2 class="text-3xl font-bold text-zatara-blue">مرحباً بك في {{ $tenant->name }}</h2>
                     <p class="text-slate-500 text-base mt-2">يرجى إدخال بياناتك الأساسية للبدء بإجراءات الحجز</p>
                 </div>
 
@@ -585,9 +585,9 @@
                              pending), so promising instant confirmation here contradicted it seconds later.
                              Live-confirmed mismatch, docs/STOREFRONT_UX_AUDIT.md, Friction Point #6. --}}
                         @if(in_array($paymentMethod, ['cash', 'transfer']))
-                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بزتارة. سيبقى حجزك قيد الانتظار وسيتم تأكيد المقاعد بعد استلام الدفع خلال المهلة المحددة.
+                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بـ{{ $tenant->name }}. سيبقى حجزك قيد الانتظار وسيتم تأكيد المقاعد بعد استلام الدفع خلال المهلة المحددة.
                         @else
-                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بزتارة. سيتم تأكيد المقاعد فور الدفع بنجاح.
+                            بالنقر على "تأكيد الحجز"، فإنك توافق على الشروط والأحكام وسياسة الإلغاء الخاصة بـ{{ $tenant->name }}. سيتم تأكيد المقاعد فور الدفع بنجاح.
                         @endif
                     </div>
 

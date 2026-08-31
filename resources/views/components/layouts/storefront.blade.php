@@ -51,12 +51,13 @@
                 {{-- Logo --}}
                 @if(isset($currentTenant))
                     <a href="{{ route('storefront.catalog', ['tenant' => $currentTenant->slug]) }}" class="flex items-center gap-3 group flex-shrink-0">
-                        <img src="{{ asset('images/logo.png') }}" alt="{{ $currentTenant->name }}" class="h-12 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                        <div class="hidden items-center gap-3">
+                        @if($currentTenant->hasMedia('logo'))
+                            <img src="{{ $currentTenant->getFirstMediaUrl('logo') }}" alt="{{ $currentTenant->name }}" class="h-12 object-contain">
+                        @else
                             <span class="text-2xl font-bold tracking-wide transition-colors" :class="scrolled ? 'text-zatara-blue' : 'text-white'">
                                 {{ $currentTenant->name }}
                             </span>
-                        </div>
+                        @endif
                     </a>
                 @endif
 
@@ -220,7 +221,7 @@
                         <div class="font-bold text-3xl text-zatara-gold mb-4">{{ $currentTenant->name }}</div>
                     @endif
                     <p class="text-sm text-slate-400 font-light leading-relaxed mb-4">
-                        نقدم لك تجارب سفر مصممة بعناية لتلبي طموحك في اكتشاف العالم برفاهية مطلقة وخدمة لا تُضاهى.
+                        {{ $currentTenant->settings['agency_tagline'] ?? 'نقدم لك تجارب سفر مصممة بعناية لتلبي طموحك في اكتشاف العالم برفاهية مطلقة وخدمة لا تُضاهى.' }}
                     </p>
                     @if(!empty($currentTenant->tourism_license_number))
                         <div class="inline-block bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-300">
