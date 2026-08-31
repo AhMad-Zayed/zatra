@@ -73,7 +73,7 @@
                          "وجهاتنا"/"عن زتارة" still have no real page to link to at all, so they're
                          left as-is here -- inventing destination/about content is out of scope for
                          a bugfix pass. --}}
-                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="hover:text-zatara-gold transition-colors">اتصل بنا</a>
+                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->settings['whatsapp_number'] ?? '970599000000') }}" target="_blank" class="hover:text-zatara-gold transition-colors">اتصل بنا</a>
                 </div>
 
                 {{-- Actions --}}
@@ -98,12 +98,17 @@
                         </a>
                     @endif
 
-                    {{-- WhatsApp Button --}}
+                    {{-- WhatsApp Button -- the unscrolled state used to combine .glass-panel (a
+                         solid white background per Phase A's de-glassing, see app.css) with
+                         text-white, rendering white text/icon on a white button -- invisible
+                         against the hero. Swapped to the same transparent/outlined-over-hero
+                         treatment already used by the hero's own "تصفح جميع الرحلات" CTA
+                         (storefront-catalog.blade.php) instead of a solid fill. --}}
                     @if(isset($currentTenant))
-                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}"
+                        <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->settings['whatsapp_number'] ?? '970599000000') }}"
                            target="_blank"
                            class="hidden md:flex items-center gap-2 px-6 py-2.5 rounded-2xl text-sm font-bold transition-all border"
-                           :class="scrolled ? 'bg-zatara-blue text-white border-transparent hover:shadow-lg hover:shadow-zatara-blue/30' : 'glass-panel text-white border-white/20 hover:bg-white hover:text-zatara-blue'">
+                           :class="scrolled ? 'bg-zatara-blue text-white border-transparent hover:shadow-lg hover:shadow-zatara-blue/30' : 'bg-transparent text-white border-white/40 hover:bg-white hover:text-zatara-blue'">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                             </svg>
@@ -168,7 +173,7 @@
                 <a href="#" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">info</span> عن زتارة
                 </a>
-                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}" target="_blank" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
+                <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->settings['whatsapp_number'] ?? '970599000000') }}" target="_blank" class="py-3 px-2 text-slate-700 font-medium hover:text-zatara-blue border-b border-slate-100 flex items-center gap-3">
                     <span class="material-symbols-outlined text-[20px] text-zatara-gold">call</span> اتصل بنا
                 </a>
                 {{-- The mobile drawer never had a login/account entry at all, in either auth
@@ -188,7 +193,7 @@
                     @endauth
                 @endif
                 @if(isset($currentTenant))
-                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->phone ?? '970599000000') }}"
+                    <a href="https://wa.me/{{ preg_replace('/[^0-9]/', '', $currentTenant->settings['whatsapp_number'] ?? '970599000000') }}"
                        target="_blank"
                        class="mt-3 flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold">
                         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>

@@ -42,7 +42,12 @@
                     <div class="flex items-center gap-2">
                         <span class="material-symbols-outlined text-zatara-gold">calendar_month</span>
                         @if($instances->count() == 1 && $selectedInstance)
-                            <span>{{ $selectedInstance->start_date->format('d M, Y') }} - {{ $selectedInstance->end_date->format('d M, Y') }}</span>
+                            {{-- Latin date range inside an RTL page bidi-reorders visually
+                                 ("04 Sep, 2026 - 09 Sep, 2026" rendering as "Sep, 2026 - 09 Sep,
+                                 2026 04") without an explicit LTR isolation -- same dir="ltr"
+                                 pattern already used correctly for this exact range on the
+                                 checkout summary card (checkout-wizard.blade.php:459-460). --}}
+                            <span dir="ltr">{{ $selectedInstance->start_date->format('d M, Y') }} - {{ $selectedInstance->end_date->format('d M, Y') }}</span>
                         @elseif($instances->count() > 1)
                             <span>متوفرة في {{ $instances->count() }} مواعيد</span>
                         @else
